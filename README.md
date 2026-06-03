@@ -12,6 +12,16 @@ A step-by-step tutorial for analyzing flow cytometry data in R, built around the
 6. Unsupervised clustering — FlowSOM (optional)
 7. Statistical analysis — cell frequencies, MFI, mixed models
 
+## Why R and not FlowJo?
+
+FlowJo is the standard in most flow labs and it's good at what it does — fast, visual, and familiar. But it has a reproducibility problem. When you gate in FlowJo, the decisions you make (where you drew the gate, what you excluded, how you defined a population) live in a workspace file that isn't human-readable and doesn't travel well. If someone asks how you got your numbers, the honest answer is often "open my workspace and look." You can't easily version-control it, diff it, or hand it to a collaborator who has a different FlowJo version.
+
+In R, every decision is written down. The gate boundaries are in the code. The transformation parameters are in the code. The statistical model is in the code. If a reviewer asks why you used arcsinh with a cofactor of 150, you can point to the line. If you need to rerun the analysis six months later with one sample excluded, you change one line and rerender. If a collaborator wants to apply the same pipeline to their data, they can.
+
+The other practical advantage is that R keeps the entire analysis — from raw FCS files to final statistics — in one place. FlowJo exports numbers to Excel, Excel feeds GraphPad Prism, Prism generates figures. Every handoff is a place where something can go wrong or become disconnected from its source. R eliminates those handoffs.
+
+FlowJo still has a real role for exploratory gating during panel development or quick QC checks. This pipeline is for the analysis you'd actually report.
+
 ## Prerequisites
 
 R ≥ 4.1. Install the required packages:
@@ -55,16 +65,6 @@ The tutorial uses the GvHD dataset from the `flowCore` package (Srivastava et al
 The key difference from Aurora data: fluorescence channels in this dataset are log-amplified (`$PnE = "4,0"`, not `"0,0"`), so the standard arcsinh transformation step is skipped for this data. Script 03 explains how to detect and handle both cases. All other pipeline steps apply equally.
 
 To use this tutorial with your own Cytek Aurora data, replace the contents of `data/unmixed/` with your unmixed FCS files and update `metadata/sample_metadata.csv` and `metadata/experiment_metadata.csv` accordingly.
-
-## Why R and not FlowJo?
-
-FlowJo is the standard in most flow labs and it's good at what it does — fast, visual, and familiar. But it has a reproducibility problem. When you gate in FlowJo, the decisions you make (where you drew the gate, what you excluded, how you defined a population) live in a workspace file that isn't human-readable and doesn't travel well. If someone asks how you got your numbers, the honest answer is often "open my workspace and look." You can't easily version-control it, diff it, or hand it to a collaborator who has a different FlowJo version.
-
-In R, every decision is written down. The gate boundaries are in the code. The transformation parameters are in the code. The statistical model is in the code. If a reviewer asks why you used arcsinh with a cofactor of 150, you can point to the line. If you need to rerun the analysis six months later with one sample excluded, you change one line and rerender. If a collaborator wants to apply the same pipeline to their data, they can.
-
-The other practical advantage is that R keeps the entire analysis — from raw FCS files to final statistics — in one place. FlowJo exports numbers to Excel, Excel feeds GraphPad Prism, Prism generates figures. Every handoff is a place where something can go wrong or become disconnected from its source. R eliminates those handoffs.
-
-FlowJo still has a real role for exploratory gating during panel development or quick QC checks. This pipeline is for the analysis you'd actually report.
 
 ## Project structure
 
