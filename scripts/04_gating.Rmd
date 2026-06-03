@@ -1,106 +1,143 @@
-```{r libraries}
+---
+title: "04: Gating"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: Transformation](03_transformation.html) | [Next: Dimensionality Reduction →](05_dimensionality_reduction.html)
+
+---
+
+```{r libraries, message=FALSE, warning=FALSE}
 library(flowCore)
 library(flowWorkspace)
-library(ggcyto)
 library(openCyto)
+library(tidyverse)
 ```
 
 ```{r load}
-fs <- readRDS("data/processed/20240603_CD8tet_fs_transformed.rds")
-gs <- GatingSet(fs)
+gs <- load_gs("data/processed/GvHD_tcell_gs_base")
 ```
 
-Gating is sequential — each gate is applied within the parent population from the previous step. The order here is: all events → remove debris → remove doublets → remove dead cells → gate population of interest. Every downstream number in this analysis is a direct consequence of where these gates are drawn, so it's worth being deliberate.
+```{r plot_helper, include=FALSE}
+# Helper: extract expression data from a gating population for ggplot2 plotting
+get_pop_df <- function(gs, pop) {
+  fsApply(gs_pop_get_data(gs, pop), function(ff) {
+    as.data.frame(exprs(ff)) %>% mutate(sample = identifier(ff))
+  }, simplify = FALSE) %>% do.call(rbind, .)
+}
+```
 
-Start with the scatter gate to isolate the lymphocyte population from debris and red blood cells. Plot FSC-A vs SSC-A to find the right values for your data — the numbers below are a starting point and will need to be adjusted.
+Gating is sequential — each gate is applied within the parent population from the previous step. The order here is: all events → remove debris → remove doublets → gate population of interest. Every downstream number in this analysis is a direct consequence of where these gates are drawn.
+
+**A note on this dataset:** the GvHD data was collected on a conventional FACScan with only height (H) and one area (A) parameter — specifically FL2.A. Modern instruments record FSC-Area and SSC-Area which are the standard channels for singlet discrimination. We'll work with what this dataset provides, and differences from your own Aurora data are noted throughout.
+
+Start with the scatter gate to isolate lymphocytes from debris. Visualize first to understand the data before setting values.
+
+```{r scatter_vis, fig.width=14, fig.height=8, warning=FALSE}
+df_all <- get_pop_df(gs, "root")
+
+ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c() +
+  facet_wrap(~sample, ncol = 7) +
+  theme_minimal(base_size = 8) +
+  labs(title = "All events — identify lymphocyte cluster before setting gate")
+```
 
 ```{r scatter_gate}
-# Visualize first to pick gate boundaries
-ggcyto(gs, aes(x = "FSC.A", y = "SSC.A"), subset = "root") +
-  geom_hex(bins = 100) +
-  facet_wrap(~name)
-```
-
-```{r apply_scatter_gate}
 scatter_gate <- rectangleGate(
   filterId = "lymphocytes",
-  "FSC.A" = c(40000, 200000),
-  "SSC.A" = c(0, 80000)
+  "FSC.H"  = c(100, 850),
+  "SSC.H"  = c(0, 500)
 )
 
 gs_pop_add(gs, scatter_gate, parent = "root")
 recompute(gs)
-
-autoplot(gs, gate = "lymphocytes", bins = 100)
 ```
 
-Doublets are events where two cells passed through the laser together and got recorded as one. They show up above the diagonal in FSC-H vs FSC-A space. Single cells fall along the diagonal because height and area scale linearly for a single event.
+```{r scatter_check, fig.width=14, fig.height=8, warning=FALSE}
+ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c() +
+  geom_rect(aes(xmin = 100, xmax = 850, ymin = 0, ymax = 500),
+            fill = NA, color = "red", linewidth = 0.8, inherit.aes = FALSE) +
+  facet_wrap(~sample, ncol = 7) +
+  theme_minimal(base_size = 8) +
+  labs(title = "Lymphocyte gate (red box)")
+```
+
+For singlet discrimination, modern instruments use FSC-Height vs FSC-Area: single cells fall on a tight diagonal, doublets appear above it. This dataset doesn't have FSC-Area, so we use FL2.H vs FL2.A — the PE channel height and area — which captures the same doublet-exclusion principle. On your Aurora data, use `FSC.A` vs `FSC.H` instead.
+
+```{r singlet_vis, fig.width=14, fig.height=8, warning=FALSE}
+df_lymph <- get_pop_df(gs, "lymphocytes")
+
+ggplot(df_lymph, aes(x = FL2.A, y = FL2.H)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c() +
+  facet_wrap(~sample, ncol = 7) +
+  theme_minimal(base_size = 8) +
+  labs(title = "FL2.A vs FL2.H — singlet population falls along the diagonal")
+```
 
 ```{r singlet_gate}
-ggcyto(gs, aes(x = "FSC.A", y = "FSC.H"), subset = "lymphocytes") +
-  geom_hex(bins = 100) +
-  facet_wrap(~name)
-```
-
-```{r apply_singlet_gate}
-# Singlets fall along the diagonal — the gate below selects that diagonal cluster
-# Adjust the slope and intercept based on your instrument's FSC calibration
-singlet_gate <- polygonGate(
+singlet_gate <- rectangleGate(
   filterId = "singlets",
-  "FSC.A" = c(40000, 40000, 200000, 200000),
-  "FSC.H" = c(35000, 45000, 195000, 185000)
+  "FL2.A"  = c(0, 900),
+  "FL2.H"  = c(1, 5000)
 )
 
 gs_pop_add(gs, singlet_gate, parent = "lymphocytes")
 recompute(gs)
 ```
 
-Dead cells take up viability dyes, so they stain brightly. Live cells are dim (or negative) on the viability channel. Adjust the channel name to match whatever viability dye is in your panel.
+The GvHD panel doesn't include a viability dye. In a real experiment you would gate out dead cells here using a viability dye channel — dead cells stain brightly, live cells are dim or negative. Since we can't demonstrate this with the GvHD data, we proceed directly to the population gate.
 
-```{r live_dead_gate}
-viability_channel <- "V525.A"  # adjust — e.g. Zombie Aqua, DAPI, 7-AAD depending on your panel
+> For Aurora data, add a live/dead gate after singlets:
+> ```r
+> live_gate <- rectangleGate(filterId = "live", "V525.A" = c(-Inf, 2))
+> gs_pop_add(gs, live_gate, parent = "singlets")
+> recompute(gs)
+> ```
 
-ggcyto(gs, aes(x = "FSC.A", y = viability_channel), subset = "singlets") +
-  geom_hex(bins = 100) +
-  facet_wrap(~name)
+Now gate on your population of interest. Here we gate on FL1.H-high cells (the FITC channel).
+
+```{r population_vis, fig.width=14, fig.height=8, warning=FALSE}
+df_sing <- get_pop_df(gs, "singlets")
+
+ggplot(df_sing, aes(x = FL1.H, y = FL4.H)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c() +
+  facet_wrap(~sample, ncol = 7) +
+  theme_minimal(base_size = 8) +
+  labs(title = "FL1.H vs FL4.H — gate on your population of interest")
 ```
-
-```{r apply_live_gate}
-live_gate <- rectangleGate(
-  filterId = "live",
-  "FSC.A" = c(40000, 200000),
-  "V525.A" = c(-Inf, 2)   # adjust threshold based on the plot above
-)
-
-gs_pop_add(gs, live_gate, parent = "singlets")
-recompute(gs)
-```
-
-Now gate on your population of interest. This is panel-specific — the example below is for CD8 T cells using CD3 and CD8, but replace these with the appropriate markers for your experiment.
 
 ```{r population_gate}
-ggcyto(gs, aes(x = "B515.A", y = "R780.A"), subset = "live") +  # adjust to CD3 and CD8 channels
-  geom_hex(bins = 100) +
-  facet_wrap(~name)
-```
-
-```{r apply_population_gate}
-cd8_gate <- rectangleGate(
-  filterId = "CD8_T_cells",
-  "B515.A" = c(3, Inf),   # CD3+
-  "R780.A" = c(3, Inf)    # CD8+
+population_gate <- rectangleGate(
+  filterId         = "population_of_interest",
+  "FL1.H"          = c(1000, 10000),
+  "FL4.H"          = c(1, 10000)
 )
 
-gs_pop_add(gs, cd8_gate, parent = "live")
+gs_pop_add(gs, population_gate, parent = "singlets")
 recompute(gs)
 ```
 
-Check the cell counts at each gate across all samples. Large drops between steps are worth investigating — for example, an unusually low live gate could indicate a failed viability stain rather than a biological effect.
+Check the cell counts at each gate across all samples. Large drops between steps are worth investigating.
 
 ```{r gate_stats}
 gs_pop_get_stats(gs, nodes = gs_get_pop_paths(gs), type = "count")
 ```
 
 ```{r save}
-save_gs(gs, path = "data/processed/20240603_CD8tet_gs")
+save_gs(gs, path = "data/processed/GvHD_tcell_gs")
+cat("Gated GatingSet saved\n")
 ```
+
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: Transformation](03_transformation.html) | [Next: Dimensionality Reduction →](05_dimensionality_reduction.html)

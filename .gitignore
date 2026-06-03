@@ -11,3 +11,5 @@ output/tables/
 
 # macOS
 .DS_Store
+Rplots.pdf
+output/

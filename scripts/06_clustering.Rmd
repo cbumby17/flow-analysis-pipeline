@@ -1,4 +1,17 @@
-```{r libraries}
+---
+title: "06: Clustering (Optional)"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: Dimensionality Reduction](05_dimensionality_reduction.html) | [Next: Analysis →](07_analysis.html)
+
+---
+
+```{r libraries, message=FALSE, warning=FALSE}
 library(flowWorkspace)
 library(FlowSOM)
 library(tidyverse)
@@ -6,23 +19,23 @@ library(ggplot2)
 ```
 
 ```{r load}
-gs <- load_gs("data/processed/20240603_CD8tet_gs")
-umap_df <- readRDS("data/processed/20240603_CD8tet_umap.rds")
+gs      <- load_gs("data/processed/GvHD_tcell_gs")
+umap_df <- readRDS("data/processed/GvHD_tcell_umap.rds")
 ```
 
-This script is for discovery mode — when you want to find populations without defining them manually through gating. If your panel has predefined populations you already know how to gate (e.g. CD8 T cells, NK cells), you may not need this step. Where clustering becomes useful is for high-dimensional panels where manual gating can't capture the full complexity of a population (e.g. identifying functional subsets within your gated population of interest, or doing an unbiased survey of all live cells).
+This script is for discovery mode — when you want to find populations without defining them manually through gating. If your panel has predefined populations you already know how to gate, you may not need this step. Where clustering becomes useful is for high-dimensional panels where manual gating can't capture the full complexity (for example, identifying functional subsets within a gated population, or doing an unbiased survey of all live cells).
 
-FlowSOM works by first building a self-organizing map (SOM) on your expression data, then grouping SOM nodes into metaclusters using hierarchical clustering. The two parameters you control are `xdim`/`ydim` (the size of the SOM grid, which determines resolution) and `maxMeta` (the maximum number of metaclusters to try). Start with `maxMeta = 15` and adjust based on what you see — too few clusters merge populations that should be distinct, too many over-split.
+FlowSOM builds a self-organizing map on your expression data, then groups SOM nodes into metaclusters using hierarchical clustering. The two parameters you control are `xdim`/`ydim` (the SOM grid size, which determines resolution) and `maxMeta` (the maximum number of metaclusters to consider). Start conservatively and adjust — too few clusters merge populations that should be distinct, too many over-split into noise.
 
 ```{r extract_for_clustering}
-live_data <- gs_pop_get_data(gs, "live")
-fluor_channels <- colnames(live_data[[1]])[4:ncol(live_data[[1]])]
+fluor_channels <- c("FL1.H", "FL2.H", "FL3.H", "FL4.H")
 
-# Subsample for clustering — 2000 cells per sample is usually enough to capture structure
+singlet_data <- gs_pop_get_data(gs, "singlets")
+
 set.seed(42)
-expr_list <- fsApply(live_data, function(ff) {
-  idx <- sample(nrow(ff), min(2000, nrow(ff)))
-  df <- as.data.frame(exprs(ff)[idx, fluor_channels])
+expr_list <- fsApply(singlet_data, function(ff) {
+  idx <- sample(nrow(ff), min(500, nrow(ff)))
+  df  <- as.data.frame(exprs(ff)[idx, fluor_channels])
   df$sample <- identifier(ff)
   df
 }, simplify = FALSE)
@@ -32,32 +45,32 @@ expr_df <- bind_rows(expr_list)
 
 ```{r run_flowsom}
 fsom <- FlowSOM(
-  input = as.matrix(expr_df[, fluor_channels]),
-  xdim = 10,
-  ydim = 10,
-  maxMeta = 15,
-  seed = 42
+  input   = as.matrix(expr_df[, fluor_channels]),
+  xdim    = 7,
+  ydim    = 7,
+  maxMeta = 6,
+  seed    = 42
 )
 ```
 
-Add cluster assignments back to the expression dataframe, then join with UMAP coordinates so we can visualize which UMAP regions correspond to which clusters.
+Add cluster assignments back to the expression dataframe, then join with UMAP coordinates so we can see which UMAP regions correspond to which clusters.
 
-```{r add_clusters}
+```{r add_clusters, fig.width=6, fig.height=5, warning=FALSE}
 expr_df$cluster <- as.factor(GetMetaclusters(fsom))
 
-# Join with UMAP — they share the same subsampled cells if the seed was identical
+# The subsampled rows are in the same order as umap_df rows if seed was identical
 umap_clustered <- umap_df %>%
-  mutate(cluster = expr_df$cluster)  # this assumes the row order is the same — verify if you change the subsampling
+  mutate(cluster = expr_df$cluster)
 
 ggplot(umap_clustered, aes(x = UMAP1, y = UMAP2, color = cluster)) +
-  geom_point(size = 0.3, alpha = 0.5) +
+  geom_point(size = 0.8, alpha = 0.6) +
   theme_minimal() +
-  labs(title = "FlowSOM metaclusters on UMAP")
+  labs(title = "FlowSOM metaclusters overlaid on UMAP")
 ```
 
-To understand what each cluster represents, look at the median expression of each marker per cluster. This is the equivalent of a marker heatmap in scRNAseq — clusters should have distinct marker combinations that correspond to known populations.
+To understand what each cluster represents, look at the median expression of each marker per cluster. Clusters with distinct marker combinations correspond to populations you'd recognize from gating or from biology.
 
-```{r cluster_heatmap}
+```{r cluster_heatmap, fig.width=8, fig.height=4, warning=FALSE}
 cluster_medians <- expr_df %>%
   group_by(cluster) %>%
   summarise(across(all_of(fluor_channels), median)) %>%
@@ -68,23 +81,28 @@ ggplot(cluster_medians, aes(x = channel, y = cluster, fill = median_expression))
   scale_fill_viridis_c() +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Median marker expression per FlowSOM cluster")
+  labs(title = "Median marker expression per FlowSOM cluster",
+       x = NULL, y = "Cluster")
 ```
 
-Annotate clusters once you've identified what each one is. Some clusters may require splitting further or merging if they don't correspond to a biologically meaningful distinction.
+Once you've identified what each cluster represents from the heatmap, annotate them. Some clusters may need to be split further or merged if they don't correspond to a biologically meaningful distinction.
 
-```{r annotate_clusters}
-# Fill in cluster labels based on your marker heatmap interpretation
+```{r annotate, eval=FALSE}
+# Fill in after interpreting the heatmap above
 cluster_labels <- c(
-  "1" = "CD8 Effector",
-  "2" = "CD8 Memory",
-  "3" = "CD4 T cell"
-  # ... add the rest
+  "1" = "Population A",
+  "2" = "Population B",
+  "3" = "Population C"
+  # ... add remaining clusters
 )
 
 expr_df$population <- cluster_labels[as.character(expr_df$cluster)]
 ```
 
 ```{r save}
-saveRDS(expr_df, "data/processed/20240603_CD8tet_clustered.rds")
+saveRDS(expr_df, "data/processed/GvHD_tcell_clustered.rds")
 ```
+
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: Dimensionality Reduction](05_dimensionality_reduction.html) | [Next: Analysis →](07_analysis.html)

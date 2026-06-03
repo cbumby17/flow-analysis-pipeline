@@ -1,0 +1,59 @@
+---
+title: "Flow Cytometry Analysis in R"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+A step-by-step tutorial for analyzing flow cytometry data in R, built around the Cytek Aurora spectral flow cytometer. The pipeline covers everything from loading FCS files through statistical analysis.
+
+The example data used throughout is the GvHD dataset from the `flowCore` package — a longitudinal study of bone marrow transplant patients. It runs on conventional flow cytometry data, so a few steps differ from Aurora data (notably the transformation step). Differences are clearly noted in each script.
+
+---
+
+## Tutorial scripts
+
+| Script | What it covers |
+|--------|----------------|
+| [00: Data Structures](scripts/00_data_structures.html) | FCS format, flowFrame/flowSet, the three stages of flow data |
+| [01: Load and Metadata](scripts/01_load_and_metadata.html) | Reading FCS files, attaching sample and experiment metadata |
+| [02: QC](scripts/02_qc.html) | Temporal instability, margin events, PeacoQC |
+| [03: Transformation](scripts/03_transformation.html) | Checking `$PnE`, arcsinh vs. pre-transformed data |
+| [04: Gating](scripts/04_gating.html) | Sequential manual gating: scatter, singlets, population of interest |
+| [05: Dimensionality Reduction](scripts/05_dimensionality_reduction.html) | UMAP |
+| [06: Clustering](scripts/06_clustering.html) | FlowSOM (optional — for discovery mode) |
+| [07: Analysis](scripts/07_analysis.html) | Cell frequencies, MFI, linear mixed models |
+
+---
+
+## Setup
+
+Clone the repo, install the required packages, then run the data setup script once:
+
+```r
+# CRAN
+install.packages(c("tidyverse", "uwot", "lme4", "emmeans", "gridExtra"))
+
+# Bioconductor
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "PeacoQC", "FlowSOM"))
+
+# Generate the example data
+source("data/get_example_data.R")
+```
+
+Then work through the scripts in order, starting with [00: Data Structures](scripts/00_data_structures.html).
+
+---
+
+## Why R and not FlowJo?
+
+FlowJo is the standard in most flow labs and it's good at what it does — fast, visual, and familiar. But it has a reproducibility problem. When you gate in FlowJo, the decisions you make live in a workspace file that isn't human-readable and doesn't travel well. You can't easily version-control it, diff it, or hand it to a collaborator who has a different FlowJo version.
+
+In R, every decision is written down. The gate boundaries are in the code. The transformation parameters are in the code. The statistical model is in the code. If a reviewer asks why you used arcsinh with a cofactor of 150, you can point to the line. If you need to rerun the analysis six months later with one sample excluded, you change one line and rerender.
+
+The other practical advantage is that R keeps the entire analysis — from raw FCS files to final statistics — in one place. FlowJo exports numbers to Excel, Excel feeds GraphPad Prism, Prism generates figures. Every handoff is a place where something can go wrong. R eliminates those handoffs.
+
+FlowJo still has a real role for exploratory gating during panel development or quick QC checks. This pipeline is for the analysis you'd actually report.

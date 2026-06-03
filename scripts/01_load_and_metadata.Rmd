@@ -1,4 +1,17 @@
-```{r libraries}
+---
+title: "01: Load Data and Attach Metadata"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+> **Navigation:** [Home](../index.html) | [Next: QC →](02_qc.html)
+
+---
+
+```{r libraries, message=FALSE, warning=FALSE}
 library(flowCore)
 library(tidyverse)
 ```
@@ -18,11 +31,11 @@ fs
 
 Load the two metadata files separately, then join them on `experiment_id`. Keeping them separate until this point makes it easier to validate each one before merging.
 
-```{r load_metadata}
+```{r load_metadata, message=FALSE}
 sample_meta <- read_csv("metadata/sample_metadata.csv")
 experiment_meta <- read_csv("metadata/experiment_metadata.csv")
 
-meta <- left_join(sample_meta, experiment_meta, by = "experiment_id")
+meta <- left_join(sample_meta, experiment_meta, by = "experiment_id") |> as.data.frame()
 ```
 
 Before attaching metadata to the flowSet, reorder its rows to match `sampleNames(fs)` exactly. `pData()` expects a one-to-one correspondence and does not reorder automatically.
@@ -43,6 +56,8 @@ stopifnot(all(rownames(pData(fs)) == sampleNames(fs)))
 summary(is.na(pData(fs)))
 ```
 
-```{r save}
-saveRDS(fs, "data/processed/20240603_CD8tet_fs_raw.rds")
-```
+The metadata is now attached. The next script re-loads from the original FCS files and applies QC filtering — no intermediate save is needed since the source files are already in `data/unmixed/` and the metadata is already in `metadata/`.
+
+---
+
+> **Navigation:** [Home](../index.html) | [Next: QC →](02_qc.html)

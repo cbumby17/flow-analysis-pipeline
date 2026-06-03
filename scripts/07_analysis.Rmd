@@ -1,4 +1,17 @@
-```{r libraries}
+---
+title: "07: Statistical Analysis"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: Clustering](06_clustering.html)
+
+---
+
+```{r libraries, message=FALSE, warning=FALSE}
 library(flowWorkspace)
 library(tidyverse)
 library(ggplot2)
@@ -7,7 +20,7 @@ library(emmeans)
 ```
 
 ```{r load}
-gs <- load_gs("data/processed/20240603_CD8tet_gs")
+gs   <- load_gs("data/processed/GvHD_tcell_gs")
 meta <- pData(gs) %>% rownames_to_column("sample")
 ```
 
@@ -15,93 +28,112 @@ This script extracts the numbers we actually want to compare across groups: cell
 
 ## Cell frequencies
 
-We report frequencies as percentage of the parent gate rather than absolute cell counts. Absolute counts depend on how much blood or tissue you started with, which introduces variation unrelated to biology. Percentage of parent is the standard in flow cytometry for this reason.
+We report frequencies as percentage of the parent gate rather than absolute cell counts. Absolute counts depend on how much sample you started with, which introduces variation unrelated to biology. Percentage of parent is the standard in flow cytometry.
 
 ```{r extract_frequencies}
-# Get counts at each gating node
 stats <- gs_pop_get_stats(gs, nodes = gs_get_pop_paths(gs), type = "percent")
 
-# Focus on the population of interest as a percent of live cells
 freq_df <- stats %>%
-  filter(pop == "/lymphocytes/singlets/live/CD8_T_cells") %>%
-  rename(sample = sample, pct_of_live = percent) %>%
+  filter(pop == "/lymphocytes/singlets/population_of_interest") %>%
+  rename(pct_of_singlets = percent) %>%
   left_join(meta, by = "sample")
 
 freq_df
 ```
 
-Plot frequencies by treatment group. Use a dotplot with individual points rather than a bar chart — bar charts hide the sample-level distribution and make it hard to see outliers or small group sizes.
+Use a dotplot with individual points rather than a bar chart. Bar charts hide the sample-level distribution and make it hard to see outliers or small group sizes. The crossbar shows the group mean.
 
-```{r plot_frequencies}
-ggplot(freq_df, aes(x = treatment, y = pct_of_live, color = treatment)) +
-  geom_jitter(width = 0.1, size = 2) +
+```{r plot_frequencies, fig.width=5, fig.height=4, warning=FALSE}
+ggplot(freq_df, aes(x = treatment, y = pct_of_singlets, color = treatment)) +
+  geom_jitter(width = 0.1, size = 2.5) +
   stat_summary(fun = mean, geom = "crossbar", width = 0.3, color = "black") +
   theme_minimal() +
   labs(
-    y = "CD8 T cells (% of live)",
-    x = NULL,
-    title = "CD8 T cell frequency by treatment"
+    y     = "Population of interest (% of singlets)",
+    x     = NULL,
+    title = "Cell frequency by GvHD status"
   ) +
   theme(legend.position = "none")
 ```
 
-## Marker expression (MFI)
+Also worth plotting how frequency changes over time within patients:
 
-MFI (median fluorescence intensity) tells you how much of a marker is expressed on a per-cell basis within a gated population. We use median rather than mean because the arcsinh-transformed distributions are sometimes skewed.
-
-```{r extract_mfi}
-cd8_data <- gs_pop_get_data(gs, "CD8_T_cells")
-fluor_channels <- colnames(cd8_data[[1]])[4:ncol(cd8_data[[1]])]
-
-mfi_df <- fsApply(cd8_data, function(ff) {
-  apply(exprs(ff)[, fluor_channels], 2, median)
-}, simplify = TRUE) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column("sample") %>%
-  left_join(meta, by = "sample")
+```{r plot_longitudinal, fig.width=7, fig.height=4, warning=FALSE}
+ggplot(freq_df, aes(x = timepoint_days, y = pct_of_singlets,
+                    color = treatment, group = patient_id)) +
+  geom_line(alpha = 0.6) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(
+    x     = "Days post-transplant",
+    y     = "Population of interest (% of singlets)",
+    title = "Longitudinal cell frequency per patient"
+  )
 ```
 
-```{r plot_mfi}
-# Plot MFI for a specific marker across treatment groups
-marker_channel <- "B515.A"  # replace with the channel for your marker of interest
-marker_name <- "CD44"        # replace with the marker name
+## Marker expression (MFI)
 
-ggplot(mfi_df, aes(x = treatment, y = .data[[marker_channel]], color = treatment)) +
-  geom_jitter(width = 0.1, size = 2) +
+MFI (median fluorescence intensity) tells you how much of a marker is expressed on a per-cell basis within a gated population. We use median rather than mean because the distributions are sometimes skewed.
+
+```{r extract_mfi}
+fluor_channels <- c("FL1.H", "FL2.H", "FL3.H", "FL4.H")
+
+pop_data <- gs_pop_get_data(gs, "population_of_interest")
+
+mfi_list <- fsApply(pop_data, function(ff) {
+  vals <- apply(exprs(ff)[, fluor_channels, drop = FALSE], 2, median)
+  as.data.frame(t(vals))
+}, simplify = FALSE)
+
+mfi_df <- bind_rows(mfi_list, .id = "sample") %>%
+  left_join(meta, by = "sample")
+
+head(mfi_df[, c("sample", "FL1.H", "FL2.H", "treatment")])
+```
+
+```{r plot_mfi, fig.width=5, fig.height=4, warning=FALSE}
+ggplot(mfi_df, aes(x = treatment, y = .data[["FL1.H"]], color = treatment)) +
+  geom_jitter(width = 0.1, size = 2.5) +
   stat_summary(fun = median, geom = "crossbar", width = 0.3, color = "black") +
   theme_minimal() +
   labs(
-    y = paste(marker_name, "MFI (arcsinh)"),
-    x = NULL,
-    title = paste(marker_name, "expression on CD8 T cells")
+    y     = "FL1.H MFI",
+    x     = NULL,
+    title = "FL1.H expression by GvHD status"
   ) +
   theme(legend.position = "none")
 ```
 
 ## Statistical comparisons
 
-We use a linear mixed model with cage as a random effect. Cage is nearly always a confound in mouse experiments — animals within the same cage share microbiome, bedding, and social environment. Including it as a random effect accounts for this without treating it as a fixed variable of interest.
+This is a longitudinal dataset with repeated measurements per patient — the same patients are measured at multiple visits. We use a linear mixed model with patient as a random effect to account for this. For mouse experiments, use cage as the random effect instead (see model comment below).
 
 ```{r stats_frequency}
-# Fit model
-model_freq <- lmer(pct_of_live ~ treatment + (1 | cage), data = freq_df)
+model_freq <- lmer(pct_of_singlets ~ treatment + timepoint_days + (1 | patient_id),
+                   data = freq_df)
 summary(model_freq)
+```
 
-# Pairwise comparisons between treatment groups
+```{r emmeans_frequency}
 emmeans(model_freq, pairwise ~ treatment)
 ```
 
 ```{r stats_mfi}
-model_mfi <- lmer(.data[[marker_channel]] ~ treatment + (1 | cage), data = mfi_df)
-summary(model_mfi)
+model_mfi <- lmer(mfi_df[["FL1.H"]] ~ treatment + timepoint_days + (1 | patient_id),
+                  data = mfi_df)
 
 emmeans(model_mfi, pairwise ~ treatment)
 ```
 
+> For mouse experiments, replace `(1 | patient_id)` with `(1 | cage)` and `timepoint_days` with your experimental timepoint variable. Always include cage as a random effect in mouse studies — animals within the same cage share environment, microbiome, and social conditions, and this is almost always a confound.
+
 ```{r save_results}
 dir.create("output/tables", recursive = TRUE, showWarnings = FALSE)
 
-write_csv(freq_df, "output/tables/20240603_CD8tet_frequencies.csv")
-write_csv(mfi_df, "output/tables/20240603_CD8tet_mfi.csv")
+write_csv(freq_df, "output/tables/GvHD_tcell_frequencies.csv")
+write_csv(mfi_df,  "output/tables/GvHD_tcell_mfi.csv")
 ```
+
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: Clustering](06_clustering.html)

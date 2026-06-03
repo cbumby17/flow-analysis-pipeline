@@ -1,52 +1,78 @@
-```{r libraries}
+---
+title: "03: Transformation"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: QC](02_qc.html) | [Next: Gating →](04_gating.html)
+
+---
+
+```{r libraries, message=FALSE, warning=FALSE}
 library(flowCore)
+library(flowWorkspace)
 library(ggcyto)
+library(tidyverse)
 ```
 
-```{r load}
-fs <- readRDS("data/processed/20240603_CD8tet_fs_qc.rds")
+```{r load, message=FALSE}
+qc_files <- list.files("data/processed/qc", pattern = "fcs$", full.names = TRUE)
+frames <- lapply(qc_files, read.FCS, transformation = FALSE, alter.names = TRUE)
+names(frames) <- basename(qc_files)
+fs <- as(frames, "flowSet")
+
+sample_meta <- read_csv("metadata/sample_metadata.csv", show_col_types = FALSE)
+experiment_meta <- read_csv("metadata/experiment_metadata.csv", show_col_types = FALSE)
+meta <- left_join(sample_meta, experiment_meta, by = "experiment_id") |> as.data.frame()
+meta_ordered <- meta[match(sampleNames(fs), meta$filename), ]
+rownames(meta_ordered) <- meta_ordered$filename
+pData(fs) <- meta_ordered
 ```
 
-Before applying any transformation, check the `$PnE` keyword to confirm the data is stored as untransformed linear values. If it's `"0,0"` for all channels, you're working with linear data and can proceed. Anything else means SpectroFlo (or whatever acquisition software exported the file) already applied a transformation, and you need to account for that before adding another one.
+Before applying any transformation, check the `$PnE` keyword to confirm how the data is stored. `$PnE = "0,0"` means untransformed linear — you apply arcsinh yourself. Anything else means a transformation was already applied at acquisition or export.
 
 ```{r check_pne}
-# Check the first few channels of the first sample — if one is non-zero, check all
-keyword(fs[[1]], paste0("$P", 1:5, "E"))
+keyword(fs[[1]], paste0("$P", 1:7, "E"))
 ```
 
-We use arcsinh with a cofactor of 150 for Aurora data. This is applied only to the fluorochrome channels — scatter parameters (FSC, SSC) are already on a meaningful linear scale and should not be transformed.
+For this dataset, the scatter channels (FSC.H, SSC.H) are `"0,0"` — linear, as expected. The fluorescence channels (FL1.H, FL2.H, FL3.H, FL4.H) are `"4,0"`, which means the data was collected through a log amplifier and stored on a 4-decade log scale. **This data is already transformed.** Applying arcsinh on top of it would be wrong and would make the data difficult to interpret.
 
-```{r transform}
-fluor_channels <- colnames(fs)[4:ncol(fs[[1]])]
+This is a fundamental difference between conventional cytometers and modern digital instruments like the Cytek Aurora. On the Aurora, data is captured as linear detector voltages and stored with `$PnE = "0,0"` — you choose and apply the transformation yourself in R. On older conventional cytometers with analog electronics, the log transformation happens in hardware before the signal is digitized. Always check `$PnE` before doing anything.
 
-asinhTrans <- arcsinhTransform(transformationId = "arcsinh", a = 0, b = 1/150, c = 0)
-transList <- transformList(fluor_channels, asinhTrans)
+For reference, the `"4,0"` format means the stored channel value $x$ was generated from the original signal $y$ as:
 
-fs_transformed <- transform(fs, transList)
-```
+$$x = \frac{R}{f_1} \log_{10}(y)$$
 
-Plot a few channels before and after to confirm the transformation is doing what you expect. You're looking for dim and bright populations that were compressed near zero on the linear scale to become clearly separated after transformation. If everything looks like a single blob even after transformation, it may indicate unmixing problems upstream.
+where $R$ is the channel range and $f_1 = 4$ is the number of log decades. So the raw stored value is already on a log scale with 4 decades of dynamic range.
 
-```{r before_after}
-# Pick a channel that has a bimodal distribution in your panel — a marker you expect to be positive on some cells and negative on others
-channel_to_check <- "B515.A"  # adjust to a relevant marker for your panel
+Since this data is pre-transformed, we skip arcsinh and visualize the fluorescence channels directly. You should see clear populations.
 
-p_before <- ggcyto(fs, aes(x = channel_to_check)) +
-  geom_density(fill = "steelblue", alpha = 0.5) +
+```{r visualize, fig.width=12, fig.height=6, warning=FALSE, message=FALSE}
+ggcyto(fs[1:6], aes(x = "FL1.H", y = "FL2.H")) +
+  geom_hex(bins = 50) +
   facet_wrap(~name) +
-  labs(title = "Before transformation (linear scale)")
-
-p_after <- ggcyto(fs_transformed, aes(x = channel_to_check)) +
-  geom_density(fill = "coral", alpha = 0.5) +
-  facet_wrap(~name) +
-  labs(title = "After arcsinh (cofactor 150)")
-
-p_before
-p_after
+  labs(title = "FL1.H vs FL2.H — log-amplified, no additional transformation needed")
 ```
 
-If the cofactor of 150 feels too compressed or too spread for your data, you can adjust it. A smaller cofactor (e.g. 50) compresses the low end more and spreads the high end; a larger cofactor (e.g. 300) does the opposite. That said, 150 is the community standard for fluorescence intensity data and changing it makes comparisons with published analyses harder.
+We convert to a GatingSet at this step, which is how `flowWorkspace` persists the data for all downstream gating, UMAP, and analysis scripts. Even with no gates applied yet, `save_gs()` correctly serializes the flowSet data. When working with Aurora data where transformation is applied, the transformed flowSet would be converted here.
 
 ```{r save}
-saveRDS(fs_transformed, "data/processed/20240603_CD8tet_fs_transformed.rds")
+gs <- GatingSet(fs)
+save_gs(gs, path = "data/processed/GvHD_tcell_gs_base")
+cat("GatingSet saved to data/processed/GvHD_tcell_gs_base\n")
 ```
+
+> For Cytek Aurora data: load the QC-cleaned flowSet, verify `$PnE = "0,0"` for all fluorochrome channels, then apply arcsinh with cofactor 150:
+> ```r
+> fluor_channels <- c("B515.A", "V525.A", ...)  # your panel's channels
+> asinhTrans <- arcsinhTransform(transformationId = "arcsinh", a = 0, b = 1/150, c = 0)
+> transList <- transformList(fluor_channels, asinhTrans)
+> fs_transformed <- transform(fs, transList)
+> ```
+
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: QC](02_qc.html) | [Next: Gating →](04_gating.html)

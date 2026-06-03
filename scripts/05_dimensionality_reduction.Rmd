@@ -1,4 +1,17 @@
-```{r libraries}
+---
+title: "05: Dimensionality Reduction"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: Gating](04_gating.html) | [Next: Clustering →](06_clustering.html)
+
+---
+
+```{r libraries, message=FALSE, warning=FALSE}
 library(flowWorkspace)
 library(uwot)
 library(ggplot2)
@@ -6,19 +19,20 @@ library(tidyverse)
 ```
 
 ```{r load}
-gs <- load_gs("data/processed/20240603_CD8tet_gs")
+gs <- load_gs("data/processed/GvHD_tcell_gs")
 ```
 
-UMAP takes all your fluorochrome channels and compresses them into two dimensions, letting you visualize the overall structure of your data — which populations exist, how distinct they are, and whether samples cluster by treatment or by something you don't expect (like batch or operator). This is an exploratory step, not an analytical one. What you see here should guide your interpretation of the gating and clustering steps, not replace them.
+UMAP takes all your fluorochrome channels and compresses them into two dimensions, letting you visualize the overall structure of your data — which populations exist, how distinct they are, and whether samples cluster by treatment or by something unexpected (like batch or operator). This is an exploratory step, not an analytical one. What you see here should guide interpretation, not replace gating or statistics.
 
-We run UMAP on the live, singlet-gated cells. Running it on all events would just show you debris clusters. We also subsample before running — UMAP doesn't need every cell to find the structure, and running it on 500k+ cells is slow with minimal benefit.
+We run UMAP on the singlet-gated cells and subsample before running — UMAP doesn't need every cell to find the structure, and running it on very large datasets is slow with minimal benefit.
 
 ```{r extract_expression}
-# Extract expression matrix from the live gate across all samples
-live_data <- gs_pop_get_data(gs, "live")
+fluor_channels <- c("FL1.H", "FL2.H", "FL3.H", "FL4.H")
 
-expr_list <- fsApply(live_data, function(ff) {
-  as.data.frame(exprs(ff)) %>%
+singlet_data <- gs_pop_get_data(gs, "singlets")
+
+expr_list <- fsApply(singlet_data, function(ff) {
+  as.data.frame(exprs(ff)[, fluor_channels]) %>%
     mutate(sample = identifier(ff))
 }, simplify = FALSE)
 
@@ -27,7 +41,7 @@ expr_df <- bind_rows(expr_list)
 
 ```{r subsample}
 set.seed(42)
-n_per_sample <- 2000  # adjust based on how many samples you have and how fast you want this to run
+n_per_sample <- 500  # small dataset so this keeps it fast
 
 expr_sub <- expr_df %>%
   group_by(sample) %>%
@@ -35,54 +49,62 @@ expr_sub <- expr_df %>%
   ungroup()
 ```
 
-```{r run_umap}
-fluor_channels <- colnames(gs_pop_get_data(gs, "live")[[1]])[4:ncol(gs_pop_get_data(gs, "live")[[1]])]
-
+```{r run_umap, message=FALSE}
 umap_coords <- umap(
   expr_sub[, fluor_channels],
   n_neighbors = 15,
-  min_dist = 0.3,
-  n_threads = 4,
-  verbose = TRUE
+  min_dist    = 0.3,
+  n_threads   = 4,
+  verbose     = FALSE
 )
 
 umap_df <- expr_sub %>%
-  select(sample, all_of(fluor_channels)) %>%
   mutate(UMAP1 = umap_coords[, 1], UMAP2 = umap_coords[, 2])
 ```
 
-Plot colored by individual markers to understand what's driving the structure. Go through each fluorochrome channel — populations you recognize should form distinct regions on the UMAP.
+Plot colored by each marker to understand what's driving the structure. Regions with high expression of a marker should correspond to populations you'd recognize from gating.
 
-```{r marker_plots}
-# Cycle through your markers — replace "B515.A" with whatever you want to look at
+```{r marker_plots, fig.width=10, fig.height=8, warning=FALSE}
 plot_marker <- function(df, channel) {
   ggplot(df, aes(x = UMAP1, y = UMAP2, color = .data[[channel]])) +
-    geom_point(size = 0.3, alpha = 0.5) +
+    geom_point(size = 0.5, alpha = 0.6) +
     scale_color_viridis_c() +
     labs(title = channel) +
-    theme_minimal()
+    theme_minimal() +
+    theme(legend.position = "right")
 }
 
-plot_marker(umap_df, "B515.A")
+p1 <- plot_marker(umap_df, "FL1.H")
+p2 <- plot_marker(umap_df, "FL2.H")
+p3 <- plot_marker(umap_df, "FL3.H")
+p4 <- plot_marker(umap_df, "FL4.H")
+
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
 
-Also plot colored by sample metadata to check whether samples are mixing properly or separating by something you don't want them to. Samples from the same treatment group should overlap substantially. If you see a clear separation by operator or by date rather than by treatment, that's a batch effect worth investigating before you proceed to statistics.
+Also plot colored by metadata to check whether samples are mixing properly or separating by something unexpected. Samples from the same treatment group should largely overlap. A clear separation by patient or visit rather than by disease grade could indicate a batch effect worth investigating before statistics.
 
-```{r metadata_plots}
+```{r metadata_plots, fig.width=10, fig.height=4, warning=FALSE, message=FALSE}
 meta <- pData(gs) %>% rownames_to_column("sample")
 umap_df <- left_join(umap_df, meta, by = "sample")
 
-ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = treatment)) +
-  geom_point(size = 0.3, alpha = 0.5) +
+p_treatment <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = treatment)) +
+  geom_point(size = 0.5, alpha = 0.5) +
   theme_minimal() +
-  labs(title = "UMAP colored by treatment")
+  labs(title = "Colored by treatment")
 
-ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = sample)) +
-  geom_point(size = 0.3, alpha = 0.3) +
+p_patient <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = patient_id)) +
+  geom_point(size = 0.5, alpha = 0.5) +
   theme_minimal() +
-  labs(title = "UMAP colored by sample — check for sample-level batch effects")
+  labs(title = "Colored by patient — check for patient-level batch effects")
+
+gridExtra::grid.arrange(p_treatment, p_patient, ncol = 2)
 ```
 
 ```{r save}
-saveRDS(umap_df, "data/processed/20240603_CD8tet_umap.rds")
+saveRDS(umap_df, "data/processed/GvHD_tcell_umap.rds")
 ```
+
+---
+
+> **Navigation:** [Home](../index.html) | [← Prev: Gating](04_gating.html) | [Next: Clustering →](06_clustering.html)
