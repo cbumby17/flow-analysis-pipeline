@@ -1,0 +1,2 @@
+experiment_id,date,operator,instrument,panel_name,panel_version,unmixing_operator,unmixing_date,notes
+GvHD_tcell,NA,Srivastava_et_al,FACScan,T Cell Panel,v1.0,NA,NA,"Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is '4,0' for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03."

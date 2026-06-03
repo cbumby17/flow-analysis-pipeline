@@ -1,0 +1,83 @@
+```{r libraries}
+library(flowCore)
+library(PeacoQC)
+library(ggcyto)
+library(tidyverse)
+```
+
+```{r load}
+fs <- readRDS("data/processed/20240603_CD8tet_fs_raw.rds")
+```
+
+Before anything else, we check for acquisition problems. Two things to look for: signal instability over time (caused by clogging or fluidics issues mid-run) and margin events (events where the signal hit the detector ceiling and the true value is unknown).
+
+Plotting signal against time is the fastest way to spot a run that went wrong. A healthy acquisition looks flat. A sudden spike, gradual drift, or a section of flat line followed by a jump usually means something happened to the flow rate.
+
+```{r time_plots}
+# Adjust the y-axis channel to a marker you care about for your panel
+ggcyto(fs, aes(x = "Time", y = "B515.A")) +
+  geom_hex(bins = 100) +
+  facet_wrap(~name, scales = "free") +
+  labs(title = "Signal stability over time — inspect each sample before proceeding")
+```
+
+PeacoQC automates this detection. It identifies and removes anomalous events based on signal consistency over time, which is more systematic than eyeballing. We run it on each sample and save the cleaned frames.
+
+```{r peaco_qc}
+dir.create("output/qc", recursive = TRUE, showWarnings = FALSE)
+
+fluor_channels <- colnames(fs)[4:ncol(fs[[1]])]
+
+fs_qc <- fsApply(fs, function(ff) {
+  result <- PeacoQC(
+    ff = ff,
+    channels = fluor_channels,
+    output_directory = "output/qc",
+    name = identifier(ff),
+    plot = TRUE,
+    save_fcs = FALSE
+  )
+  result$FinalFF
+})
+```
+
+After running PeacoQC, check how many events were removed from each sample. Losing a small fraction is expected — anything over 20% is worth going back to look at the time plots for that sample.
+
+```{r qc_summary}
+events_before <- fsApply(fs, nrow)
+events_after <- fsApply(fs_qc, nrow)
+
+data.frame(
+  sample = sampleNames(fs),
+  before = events_before,
+  after = events_after,
+  pct_retained = round(events_after / events_before * 100, 1)
+)
+```
+
+Margin events are events where the detector recorded a value at the maximum of its range, meaning the true signal was even higher and got clipped. We don't know the actual value, so we remove them. These are distinct from what PeacoQC catches — PeacoQC looks at temporal instability, not ceiling effects.
+
+```{r margin_events}
+remove_margin_events <- function(ff) {
+  channel_range <- fsApply(ff, function(x) range(parameters(x)$range))
+  at_ceiling <- apply(exprs(ff), 1, function(row) {
+    any(row >= channel_range[2, ] * 0.9999)
+  })
+  ff[!at_ceiling, ]
+}
+
+fs_clean <- fsApply(fs_qc, remove_margin_events)
+```
+
+```{r qc_report}
+# Final event count after both QC steps
+data.frame(
+  sample = sampleNames(fs_clean),
+  final_events = fsApply(fs_clean, nrow),
+  pct_of_original = round(fsApply(fs_clean, nrow) / fsApply(fs, nrow) * 100, 1)
+)
+```
+
+```{r save}
+saveRDS(fs_clean, "data/processed/20240603_CD8tet_fs_qc.rds")
+```

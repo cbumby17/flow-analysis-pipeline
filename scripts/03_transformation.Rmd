@@ -1,0 +1,52 @@
+```{r libraries}
+library(flowCore)
+library(ggcyto)
+```
+
+```{r load}
+fs <- readRDS("data/processed/20240603_CD8tet_fs_qc.rds")
+```
+
+Before applying any transformation, check the `$PnE` keyword to confirm the data is stored as untransformed linear values. If it's `"0,0"` for all channels, you're working with linear data and can proceed. Anything else means SpectroFlo (or whatever acquisition software exported the file) already applied a transformation, and you need to account for that before adding another one.
+
+```{r check_pne}
+# Check the first few channels of the first sample — if one is non-zero, check all
+keyword(fs[[1]], paste0("$P", 1:5, "E"))
+```
+
+We use arcsinh with a cofactor of 150 for Aurora data. This is applied only to the fluorochrome channels — scatter parameters (FSC, SSC) are already on a meaningful linear scale and should not be transformed.
+
+```{r transform}
+fluor_channels <- colnames(fs)[4:ncol(fs[[1]])]
+
+asinhTrans <- arcsinhTransform(transformationId = "arcsinh", a = 0, b = 1/150, c = 0)
+transList <- transformList(fluor_channels, asinhTrans)
+
+fs_transformed <- transform(fs, transList)
+```
+
+Plot a few channels before and after to confirm the transformation is doing what you expect. You're looking for dim and bright populations that were compressed near zero on the linear scale to become clearly separated after transformation. If everything looks like a single blob even after transformation, it may indicate unmixing problems upstream.
+
+```{r before_after}
+# Pick a channel that has a bimodal distribution in your panel — a marker you expect to be positive on some cells and negative on others
+channel_to_check <- "B515.A"  # adjust to a relevant marker for your panel
+
+p_before <- ggcyto(fs, aes(x = channel_to_check)) +
+  geom_density(fill = "steelblue", alpha = 0.5) +
+  facet_wrap(~name) +
+  labs(title = "Before transformation (linear scale)")
+
+p_after <- ggcyto(fs_transformed, aes(x = channel_to_check)) +
+  geom_density(fill = "coral", alpha = 0.5) +
+  facet_wrap(~name) +
+  labs(title = "After arcsinh (cofactor 150)")
+
+p_before
+p_after
+```
+
+If the cofactor of 150 feels too compressed or too spread for your data, you can adjust it. A smaller cofactor (e.g. 50) compresses the low end more and spreads the high end; a larger cofactor (e.g. 300) does the opposite. That said, 150 is the community standard for fluorescence intensity data and changing it makes comparisons with published analyses harder.
+
+```{r save}
+saveRDS(fs_transformed, "data/processed/20240603_CD8tet_fs_transformed.rds")
+```

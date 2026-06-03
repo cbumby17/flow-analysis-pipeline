@@ -1,0 +1,48 @@
+```{r libraries}
+library(flowCore)
+library(tidyverse)
+```
+
+We start by reading the unmixed FCS files from `data/unmixed/`. We name each frame by its filename immediately so that when we build the flowSet, `sampleNames()` returns something meaningful rather than the default numeric index. This naming matters because we'll use the filename as the join key when we attach metadata.
+
+```{r load_fcs}
+fcs_dir <- "data/unmixed"
+fcs_files <- list.files(fcs_dir, pattern = "\\.fcs$", full.names = TRUE)
+
+frames <- lapply(fcs_files, read.FCS, transformation = FALSE, alter.names = TRUE)
+names(frames) <- basename(fcs_files)
+
+fs <- as(frames, "flowSet")
+fs
+```
+
+Load the two metadata files separately, then join them on `experiment_id`. Keeping them separate until this point makes it easier to validate each one before merging.
+
+```{r load_metadata}
+sample_meta <- read_csv("metadata/sample_metadata.csv")
+experiment_meta <- read_csv("metadata/experiment_metadata.csv")
+
+meta <- left_join(sample_meta, experiment_meta, by = "experiment_id")
+```
+
+Before attaching metadata to the flowSet, reorder its rows to match `sampleNames(fs)` exactly. `pData()` expects a one-to-one correspondence and does not reorder automatically.
+
+```{r attach_metadata}
+meta_ordered <- meta[match(sampleNames(fs), meta$filename), ]
+rownames(meta_ordered) <- meta_ordered$filename
+
+pData(fs) <- meta_ordered
+pData(fs)
+```
+
+A quick sanity check: the number of rows in `pData(fs)` should equal the number of samples, every filename should match, and no metadata fields should be NA for samples that should have values.
+
+```{r sanity_check}
+stopifnot(nrow(pData(fs)) == length(sampleNames(fs)))
+stopifnot(all(rownames(pData(fs)) == sampleNames(fs)))
+summary(is.na(pData(fs)))
+```
+
+```{r save}
+saveRDS(fs, "data/processed/20240603_CD8tet_fs_raw.rds")
+```

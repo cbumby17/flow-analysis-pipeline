@@ -1,0 +1,88 @@
+```{r libraries}
+library(flowWorkspace)
+library(uwot)
+library(ggplot2)
+library(tidyverse)
+```
+
+```{r load}
+gs <- load_gs("data/processed/20240603_CD8tet_gs")
+```
+
+UMAP takes all your fluorochrome channels and compresses them into two dimensions, letting you visualize the overall structure of your data — which populations exist, how distinct they are, and whether samples cluster by treatment or by something you don't expect (like batch or operator). This is an exploratory step, not an analytical one. What you see here should guide your interpretation of the gating and clustering steps, not replace them.
+
+We run UMAP on the live, singlet-gated cells. Running it on all events would just show you debris clusters. We also subsample before running — UMAP doesn't need every cell to find the structure, and running it on 500k+ cells is slow with minimal benefit.
+
+```{r extract_expression}
+# Extract expression matrix from the live gate across all samples
+live_data <- gs_pop_get_data(gs, "live")
+
+expr_list <- fsApply(live_data, function(ff) {
+  as.data.frame(exprs(ff)) %>%
+    mutate(sample = identifier(ff))
+}, simplify = FALSE)
+
+expr_df <- bind_rows(expr_list)
+```
+
+```{r subsample}
+set.seed(42)
+n_per_sample <- 2000  # adjust based on how many samples you have and how fast you want this to run
+
+expr_sub <- expr_df %>%
+  group_by(sample) %>%
+  slice_sample(n = n_per_sample) %>%
+  ungroup()
+```
+
+```{r run_umap}
+fluor_channels <- colnames(gs_pop_get_data(gs, "live")[[1]])[4:ncol(gs_pop_get_data(gs, "live")[[1]])]
+
+umap_coords <- umap(
+  expr_sub[, fluor_channels],
+  n_neighbors = 15,
+  min_dist = 0.3,
+  n_threads = 4,
+  verbose = TRUE
+)
+
+umap_df <- expr_sub %>%
+  select(sample, all_of(fluor_channels)) %>%
+  mutate(UMAP1 = umap_coords[, 1], UMAP2 = umap_coords[, 2])
+```
+
+Plot colored by individual markers to understand what's driving the structure. Go through each fluorochrome channel — populations you recognize should form distinct regions on the UMAP.
+
+```{r marker_plots}
+# Cycle through your markers — replace "B515.A" with whatever you want to look at
+plot_marker <- function(df, channel) {
+  ggplot(df, aes(x = UMAP1, y = UMAP2, color = .data[[channel]])) +
+    geom_point(size = 0.3, alpha = 0.5) +
+    scale_color_viridis_c() +
+    labs(title = channel) +
+    theme_minimal()
+}
+
+plot_marker(umap_df, "B515.A")
+```
+
+Also plot colored by sample metadata to check whether samples are mixing properly or separating by something you don't want them to. Samples from the same treatment group should overlap substantially. If you see a clear separation by operator or by date rather than by treatment, that's a batch effect worth investigating before you proceed to statistics.
+
+```{r metadata_plots}
+meta <- pData(gs) %>% rownames_to_column("sample")
+umap_df <- left_join(umap_df, meta, by = "sample")
+
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = treatment)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "UMAP colored by treatment")
+
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = sample)) +
+  geom_point(size = 0.3, alpha = 0.3) +
+  theme_minimal() +
+  labs(title = "UMAP colored by sample — check for sample-level batch effects")
+```
+
+```{r save}
+saveRDS(umap_df, "data/processed/20240603_CD8tet_umap.rds")
+```

@@ -1,0 +1,106 @@
+```{r libraries}
+library(flowCore)
+library(flowWorkspace)
+library(ggcyto)
+library(openCyto)
+```
+
+```{r load}
+fs <- readRDS("data/processed/20240603_CD8tet_fs_transformed.rds")
+gs <- GatingSet(fs)
+```
+
+Gating is sequential — each gate is applied within the parent population from the previous step. The order here is: all events → remove debris → remove doublets → remove dead cells → gate population of interest. Every downstream number in this analysis is a direct consequence of where these gates are drawn, so it's worth being deliberate.
+
+Start with the scatter gate to isolate the lymphocyte population from debris and red blood cells. Plot FSC-A vs SSC-A to find the right values for your data — the numbers below are a starting point and will need to be adjusted.
+
+```{r scatter_gate}
+# Visualize first to pick gate boundaries
+ggcyto(gs, aes(x = "FSC.A", y = "SSC.A"), subset = "root") +
+  geom_hex(bins = 100) +
+  facet_wrap(~name)
+```
+
+```{r apply_scatter_gate}
+scatter_gate <- rectangleGate(
+  filterId = "lymphocytes",
+  "FSC.A" = c(40000, 200000),
+  "SSC.A" = c(0, 80000)
+)
+
+gs_pop_add(gs, scatter_gate, parent = "root")
+recompute(gs)
+
+autoplot(gs, gate = "lymphocytes", bins = 100)
+```
+
+Doublets are events where two cells passed through the laser together and got recorded as one. They show up above the diagonal in FSC-H vs FSC-A space. Single cells fall along the diagonal because height and area scale linearly for a single event.
+
+```{r singlet_gate}
+ggcyto(gs, aes(x = "FSC.A", y = "FSC.H"), subset = "lymphocytes") +
+  geom_hex(bins = 100) +
+  facet_wrap(~name)
+```
+
+```{r apply_singlet_gate}
+# Singlets fall along the diagonal — the gate below selects that diagonal cluster
+# Adjust the slope and intercept based on your instrument's FSC calibration
+singlet_gate <- polygonGate(
+  filterId = "singlets",
+  "FSC.A" = c(40000, 40000, 200000, 200000),
+  "FSC.H" = c(35000, 45000, 195000, 185000)
+)
+
+gs_pop_add(gs, singlet_gate, parent = "lymphocytes")
+recompute(gs)
+```
+
+Dead cells take up viability dyes, so they stain brightly. Live cells are dim (or negative) on the viability channel. Adjust the channel name to match whatever viability dye is in your panel.
+
+```{r live_dead_gate}
+viability_channel <- "V525.A"  # adjust — e.g. Zombie Aqua, DAPI, 7-AAD depending on your panel
+
+ggcyto(gs, aes(x = "FSC.A", y = viability_channel), subset = "singlets") +
+  geom_hex(bins = 100) +
+  facet_wrap(~name)
+```
+
+```{r apply_live_gate}
+live_gate <- rectangleGate(
+  filterId = "live",
+  "FSC.A" = c(40000, 200000),
+  "V525.A" = c(-Inf, 2)   # adjust threshold based on the plot above
+)
+
+gs_pop_add(gs, live_gate, parent = "singlets")
+recompute(gs)
+```
+
+Now gate on your population of interest. This is panel-specific — the example below is for CD8 T cells using CD3 and CD8, but replace these with the appropriate markers for your experiment.
+
+```{r population_gate}
+ggcyto(gs, aes(x = "B515.A", y = "R780.A"), subset = "live") +  # adjust to CD3 and CD8 channels
+  geom_hex(bins = 100) +
+  facet_wrap(~name)
+```
+
+```{r apply_population_gate}
+cd8_gate <- rectangleGate(
+  filterId = "CD8_T_cells",
+  "B515.A" = c(3, Inf),   # CD3+
+  "R780.A" = c(3, Inf)    # CD8+
+)
+
+gs_pop_add(gs, cd8_gate, parent = "live")
+recompute(gs)
+```
+
+Check the cell counts at each gate across all samples. Large drops between steps are worth investigating — for example, an unusually low live gate could indicate a failed viability stain rather than a biological effect.
+
+```{r gate_stats}
+gs_pop_get_stats(gs, nodes = gs_get_pop_paths(gs), type = "count")
+```
+
+```{r save}
+save_gs(gs, path = "data/processed/20240603_CD8tet_gs")
+```
