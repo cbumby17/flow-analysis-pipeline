@@ -13,6 +13,18 @@ The example data used throughout is the GvHD dataset from the `flowCore` package
 
 ---
 
+## Why R and not FlowJo?
+
+FlowJo is the standard in most flow labs and it's good at what it does — fast, visual, and familiar. But it has a reproducibility problem. When you gate in FlowJo, the decisions you make live in a workspace file that isn't human-readable and doesn't travel well. You can't easily version-control it, diff it, or hand it to a collaborator who has a different FlowJo version.
+
+In R, every decision is written down. The gate boundaries are in the code. The transformation parameters are in the code. The statistical model is in the code. If a reviewer asks why you used arcsinh with a cofactor of 150, you can point to the line. If you need to rerun the analysis six months later with one sample excluded, you change one line and rerender.
+
+The other practical advantage is that R keeps the entire analysis — from raw FCS files to final statistics — in one place. FlowJo exports numbers to Excel, Excel feeds GraphPad Prism, Prism generates figures. Every handoff is a place where something can go wrong. R eliminates those handoffs.
+
+FlowJo still has a real role for exploratory gating during panel development or quick QC checks. This pipeline is for the analysis you'd actually report.
+
+---
+
 ## Tutorial scripts
 
 | Script | What it covers |
@@ -42,14 +54,10 @@ BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "Peaco
 
 Then work through the scripts in order, starting with [01: Load and Metadata](scripts/01_load_and_metadata.html). Script 01 will walk you through setting up a working directory before any files are saved.
 
+<div style="margin-top:2em;">
+<a href="scripts/01_load_and_metadata.html" class="btn btn-primary btn-lg">Let's get started →</a>
+</div>
+
 ---
 
-## Why R and not FlowJo?
 
-FlowJo is the standard in most flow labs and it's good at what it does — fast, visual, and familiar. But it has a reproducibility problem. When you gate in FlowJo, the decisions you make live in a workspace file that isn't human-readable and doesn't travel well. You can't easily version-control it, diff it, or hand it to a collaborator who has a different FlowJo version.
-
-In R, every decision is written down. The gate boundaries are in the code. The transformation parameters are in the code. The statistical model is in the code. If a reviewer asks why you used arcsinh with a cofactor of 150, you can point to the line. If you need to rerun the analysis six months later with one sample excluded, you change one line and rerender.
-
-The other practical advantage is that R keeps the entire analysis — from raw FCS files to final statistics — in one place. FlowJo exports numbers to Excel, Excel feeds GraphPad Prism, Prism generates figures. Every handoff is a place where something can go wrong. R eliminates those handoffs.
-
-FlowJo still has a real role for exploratory gating during panel development or quick QC checks. This pipeline is for the analysis you'd actually report.
