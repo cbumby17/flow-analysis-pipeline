@@ -37,7 +37,7 @@ We report frequencies as percentage of the parent gate rather than absolute cell
 stats <- gs_pop_get_stats(gs, nodes = gs_get_pop_paths(gs), type = "percent")
 
 freq_df <- stats %>%
-  filter(pop == "/lymphocytes/singlets/population_of_interest") %>%
+  dplyr::filter(pop == "/lymphocytes/singlets/population_of_interest") %>%
   rename(pct_of_singlets = percent) %>%
   left_join(meta, by = "sample")
 

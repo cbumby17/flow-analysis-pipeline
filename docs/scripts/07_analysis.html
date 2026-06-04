@@ -1526,7 +1526,7 @@ Percentage of parent is the standard in flow cytometry.</p>
 <pre class="r"><code>stats &lt;- gs_pop_get_stats(gs, nodes = gs_get_pop_paths(gs), type = &quot;percent&quot;)
 
 freq_df &lt;- stats %&gt;%
-  filter(pop == &quot;/lymphocytes/singlets/population_of_interest&quot;) %&gt;%
+  dplyr::filter(pop == &quot;/lymphocytes/singlets/population_of_interest&quot;) %&gt;%
   rename(pct_of_singlets = percent) %&gt;%
   left_join(meta, by = &quot;sample&quot;)
 

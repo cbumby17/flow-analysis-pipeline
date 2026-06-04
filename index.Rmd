@@ -17,8 +17,7 @@ The example data used throughout is the GvHD dataset from the `flowCore` package
 
 | Script | What it covers |
 |--------|----------------|
-| [00: Data Structures](scripts/00_data_structures.html) | FCS format, flowFrame/flowSet, the three stages of flow data |
-| [01: Load and Metadata](scripts/01_load_and_metadata.html) | Reading FCS files, attaching sample and experiment metadata |
+| [01: Load and Metadata](scripts/01_load_and_metadata.html) | FCS format, flowFrame/flowSet, the three stages of flow data, loading and attaching metadata |
 | [02: QC](scripts/02_qc.html) | Temporal instability, margin events, PeacoQC |
 | [03: Transformation](scripts/03_transformation.html) | Checking `$PnE`, arcsinh vs. pre-transformed data |
 | [04: Gating](scripts/04_gating.html) | Sequential manual gating: scatter, singlets, population of interest |
@@ -41,7 +40,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocMana
 BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "PeacoQC", "FlowSOM"))
 ```
 
-Then work through the scripts in order, starting with [00: Data Structures](scripts/00_data_structures.html). Script 01 will walk you through setting up a working directory before any files are saved.
+Then work through the scripts in order, starting with [01: Load and Metadata](scripts/01_load_and_metadata.html). Script 01 will walk you through setting up a working directory before any files are saved.
 
 ---
 

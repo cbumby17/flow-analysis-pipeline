@@ -25,7 +25,6 @@ render("index.Rmd", output_dir = "docs/", knit_root_dir = root, quiet = TRUE)
 cat("Rendered: index\n")
 
 # Scripts must run in order — each depends on the previous script's saved output
-render_script("scripts/00_data_structures.rmd")
 render_script("scripts/01_load_and_metadata.Rmd")
 render_script("scripts/02_qc.Rmd")
 render_script("scripts/03_transformation.Rmd")

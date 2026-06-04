@@ -1524,38 +1524,34 @@ Differences are clearly noted in each script.</p>
 </thead>
 <tbody>
 <tr class="odd">
-<td><a href="scripts/00_data_structures.html">00: Data
-Structures</a></td>
-<td>FCS format, flowFrame/flowSet, the three stages of flow data</td>
-</tr>
-<tr class="even">
 <td><a href="scripts/01_load_and_metadata.html">01: Load and
 Metadata</a></td>
-<td>Reading FCS files, attaching sample and experiment metadata</td>
+<td>FCS format, flowFrame/flowSet, the three stages of flow data,
+loading and attaching metadata</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="scripts/02_qc.html">02: QC</a></td>
 <td>Temporal instability, margin events, PeacoQC</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="scripts/03_transformation.html">03: Transformation</a></td>
 <td>Checking <code>$PnE</code>, arcsinh vs. pre-transformed data</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="scripts/04_gating.html">04: Gating</a></td>
 <td>Sequential manual gating: scatter, singlets, population of
 interest</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="scripts/05_dimensionality_reduction.html">05:
 Dimensionality Reduction</a></td>
 <td>UMAP</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="scripts/06_clustering.html">06: Clustering</a></td>
 <td>FlowSOM (optional — for discovery mode)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="scripts/07_analysis.html">07: Analysis</a></td>
 <td>Cell frequencies, MFI, linear mixed models</td>
 </tr>
@@ -1574,9 +1570,9 @@ install.packages(c(&quot;tidyverse&quot;, &quot;uwot&quot;, &quot;lme4&quot;, &q
 # Bioconductor
 if (!requireNamespace(&quot;BiocManager&quot;, quietly = TRUE)) install.packages(&quot;BiocManager&quot;)
 BiocManager::install(c(&quot;flowCore&quot;, &quot;flowWorkspace&quot;, &quot;openCyto&quot;, &quot;ggcyto&quot;, &quot;PeacoQC&quot;, &quot;FlowSOM&quot;))</code></pre>
-<p>Then work through the scripts in order, starting with <a href="scripts/00_data_structures.html">00: Data Structures</a>. Script
-01 will walk you through setting up a working directory before any files
-are saved.</p>
+<p>Then work through the scripts in order, starting with <a href="scripts/01_load_and_metadata.html">01: Load and Metadata</a>.
+Script 01 will walk you through setting up a working directory before
+any files are saved.</p>
 <hr />
 </div>
 <div id="why-r-and-not-flowjo" class="section level2">

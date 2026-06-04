@@ -1518,6 +1518,39 @@ fs &lt;- as(frames, &quot;flowSet&quot;)
 
 meta &lt;- read.csv(&quot;data/processed/qc/GvHD_metadata.csv&quot;, row.names = 1)
 pData(fs) &lt;- meta[sampleNames(fs), ]</code></pre>
+<div id="why-transformation-is-necessary" class="section level2">
+<h2>Why transformation is necessary</h2>
+<p>Raw flow cytometry data has two properties that make it difficult to
+work with directly:</p>
+<ol style="list-style-type: decimal">
+<li><strong>The range is enormous.</strong> Highly expressed markers can
+have 100× more signal than dimly expressed ones. On a linear scale, dim
+populations collapse into an unresolvable cluster near zero.</li>
+<li><strong>Negative values exist.</strong> After compensation or
+spectral unmixing, cells with no true expression of a marker can have
+slightly negative values due to detector noise. Standard log
+transformation breaks on negatives.</li>
+</ol>
+<p>Two transformations address both problems. Which one you use depends
+on how your data was collected:</p>
+<p><strong>Logicle (biexponential)</strong> — the standard for
+conventional flow cytometry. Linear near zero (handles negatives
+gracefully) and logarithmic at high values. See Parks et al., 2006 in
+<em>Cytometry A</em>.</p>
+<p><strong>Arcsinh</strong> — the standard for mass cytometry (CyTOF)
+and modern spectral flow including the Cytek Aurora. The <code>b</code>
+parameter controls the linear-to-log transition
+(<code>b = 1/cofactor</code>; cofactor 150 is standard for flow
+cytometry). Apply only to fluorochrome channels — scatter parameters
+(FSC, SSC) are already on a meaningful linear scale and should not be
+transformed. See Bendall et al., 2011 in <em>Science</em>.</p>
+<p>The GvHD dataset was collected on a conventional cytometer with
+hardware log amplifiers, which means the transformation was applied
+before the signal was even digitized. This makes the <code>$PnE</code>
+check especially important here.</p>
+</div>
+<div id="checking-pne-before-transforming" class="section level2">
+<h2>Checking <code>$PnE</code> before transforming</h2>
 <p>Before applying any transformation, check the <code>$PnE</code>
 keyword to confirm how the data is stored. <code>$PnE = &quot;0,0&quot;</code>
 means untransformed linear — you apply arcsinh yourself. Anything else
@@ -1580,6 +1613,7 @@ UMAP, and analysis scripts. Even with no gates applied yet,
 working with Aurora data where transformation is applied, the
 transformed flowSet would be converted here.</p>
 <pre class="r"><code>gs &lt;- GatingSet(fs)
+unlink(&quot;data/processed/GvHD_tcell_gs_base&quot;, recursive = TRUE)
 save_gs(gs, path = &quot;data/processed/GvHD_tcell_gs_base&quot;)</code></pre>
 <pre><code>## Done
 ## To reload it, use &#39;load_gs&#39; function</code></pre>
@@ -1600,6 +1634,7 @@ fs_transformed &lt;- transform(fs, transList)</code></pre>
 <a href="02_qc.html" class="btn btn-default btn-sm">← Prev: QC</a>
 <a href="04_gating.html" class="btn btn-primary btn-sm">Next: Gating
 →</a></p>
+</div>
 </div>
 
 

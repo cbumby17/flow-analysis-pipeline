@@ -9,7 +9,6 @@ output:
 
 <div style="display:flex; gap:8px; margin-bottom:1.5em;">
 <a href="../index.html" class="btn btn-default btn-sm">← Home</a>
-<a href="00_data_structures.html" class="btn btn-default btn-sm">← Prev: Data Structures</a>
 <a href="02_qc.html" class="btn btn-primary btn-sm">Next: QC →</a>
 </div>
 
@@ -32,6 +31,28 @@ setwd("~/flow_tutorial")
 ```
 
 You only need to create the folder once. Each time you restart R, run `setwd("~/flow_tutorial")` before continuing.
+
+---
+
+## Data structures
+
+All flow cytometry data in R lives in two objects from the `flowCore` package:
+
+**`flowFrame`** — a single FCS file. Contains a matrix of expression values (one row per cell event and one column per measured parameter), parameter metadata, and FCS file keywords. Access the expression data directly with `exprs()`.
+
+**`flowSet`** — a collection of `flowFrame`s from one experiment. Lets you apply operations across all samples at once via `fsApply()`. Most of your work in this tutorial happens at the `flowSet` level.
+
+## Stages of flow data
+
+Before loading anything, it is important to understand where in the processing pipeline your data sits.
+
+**Stage 1: Truly raw** — raw detector voltages off the instrument. On a spectral instrument like the Cytek Aurora, one value per detector per cell across all 64 detectors. You never work with this directly.
+
+**Stage 2: Unmixed** (Aurora-specific) — SpectroFlo decomposes the full detector spectrum into per-fluorochrome values using single-stain reference spectra. **This is what gets written to the unmixed FCS file and what you load into R.** A substantial mathematical step has already occurred before you open R.
+
+**Stage 3: Transformed** — you apply arcsinh or logicle in R to compress the range and handle negative values. This is your responsibility, covered in script 03.
+
+> **Why this matters:** Errors at the unmixing stage — poor single-stains, missing autofluorescence extraction, inconsistent reference control gating — cannot be corrected in R. You are always working with the consequences of those upstream decisions.
 
 ---
 

@@ -1627,7 +1627,8 @@ between steps are worth investigating.</p>
 ## 138:  s9a07.fcs                                 /lymphocytes 10882
 ## 139:  s9a07.fcs                        /lymphocytes/singlets 10882
 ## 140:  s9a07.fcs /lymphocytes/singlets/population_of_interest    58</code></pre>
-<pre class="r"><code>save_gs(gs, path = &quot;data/processed/GvHD_tcell_gs&quot;)</code></pre>
+<pre class="r"><code>unlink(&quot;data/processed/GvHD_tcell_gs&quot;, recursive = TRUE)
+save_gs(gs, path = &quot;data/processed/GvHD_tcell_gs&quot;)</code></pre>
 <pre><code>## Done
 ## To reload it, use &#39;load_gs&#39; function</code></pre>
 <pre class="r"><code>cat(&quot;Gated GatingSet saved\n&quot;)</code></pre>
