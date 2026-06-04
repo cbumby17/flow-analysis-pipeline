@@ -32,7 +32,7 @@ This script is for discovery mode — when you want to find populations without 
 FlowSOM builds a self-organizing map on your expression data, then groups SOM nodes into metaclusters using hierarchical clustering. The two parameters you control are `xdim`/`ydim` (the SOM grid size, which determines resolution) and `maxMeta` (the maximum number of metaclusters to consider). Start conservatively and adjust — too few clusters merge populations that should be distinct, too many over-split into noise.
 
 ```{r extract_for_clustering}
-fluor_channels <- c("FL1.H", "FL2.H", "FL3.H", "FL4.H")
+fluor_channels <- c("CD15_FITC_H", "CD45_PE_H", "CD14_PerCP_H", "CD33_APC_H")
 
 singlet_data <- gs_pop_get_data(gs, "singlets")
 

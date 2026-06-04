@@ -25,6 +25,21 @@ library(tidyverse)
 ```{r load, message=FALSE}
 data(GvHD)
 colnames(GvHD) <- make.names(colnames(GvHD))
+
+# Rename channels from hardware detector names to marker_fluorochrome names.
+# Do this once here so all downstream scripts use biologically meaningful names.
+# GvHD panel: CD15-FITC (granulocytes), CD45-PE (pan-leukocyte),
+#             CD14-PerCP (monocytes), CD33-APC (myeloid)
+channel_map <- c(
+  "FL1.H" = "CD15_FITC_H",
+  "FL2.H" = "CD45_PE_H",
+  "FL3.H" = "CD14_PerCP_H",
+  "FL2.A" = "CD45_PE_A",
+  "FL4.H" = "CD33_APC_H"
+)
+cn <- colnames(GvHD)
+colnames(GvHD) <- ifelse(cn %in% names(channel_map), channel_map[cn], cn)
+
 meta <- pData(GvHD)
 meta$patient_id     <- as.character(meta$Patient)
 meta$treatment      <- ifelse(meta$Grade == 1, "Grade 1 (mild)", "Grade 3 (severe)")
@@ -41,18 +56,18 @@ Plotting signal against time is the fastest way to spot a run that went wrong. A
 time_data <- fsApply(fs, function(ff) {
   data.frame(
     Time  = exprs(ff)[, "Time"],
-    FL1.H = exprs(ff)[, "FL1.H"],
+    CD15_FITC_H = exprs(ff)[, "CD15_FITC_H"],
     sample = identifier(ff)
   )
 }, simplify = FALSE)
 time_df <- do.call(rbind, time_data)
 
-ggplot(time_df, aes(x = Time, y = FL1.H)) +
+ggplot(time_df, aes(x = Time, y = CD15_FITC_H)) +
   geom_hex(bins = 40) +
   facet_wrap(~sample, ncol = 5) +
   scale_fill_viridis_c() +
-  labs(title = "Signal stability over time — FL1.H channel",
-       x = "Time", y = "FL1.H") +
+  labs(title = "Signal stability over time — CD15 (FITC) channel",
+       x = "Time", y = "CD15_FITC_H") +
   theme_minimal(base_size = 10)
 ```
 
@@ -63,7 +78,7 @@ PeacoQC automates this detection. It identifies and removes anomalous events bas
 ```{r peaco_qc, message=FALSE, warning=FALSE, results='hide'}
 dir.create("output/qc", recursive = TRUE, showWarnings = FALSE)
 
-fluor_channels <- c("FL1.H", "FL2.H", "FL3.H", "FL4.H")
+fluor_channels <- c("CD15_FITC_H", "CD45_PE_H", "CD14_PerCP_H", "CD33_APC_H")
 
 fs_qc <- fsApply(fs, function(ff) {
   result <- PeacoQC(

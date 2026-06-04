@@ -31,7 +31,7 @@ UMAP takes all your fluorochrome channels and compresses them into two dimension
 We run UMAP on the singlet-gated cells and subsample before running — UMAP doesn't need every cell to find the structure, and running it on very large datasets is slow with minimal benefit.
 
 ```{r extract_expression}
-fluor_channels <- c("FL1.H", "FL2.H", "FL3.H", "FL4.H")
+fluor_channels <- c("CD15_FITC_H", "CD45_PE_H", "CD14_PerCP_H", "CD33_APC_H")
 
 singlet_data <- gs_pop_get_data(gs, "singlets")
 
@@ -78,10 +78,10 @@ plot_marker <- function(df, channel) {
     theme(legend.position = "right")
 }
 
-p1 <- plot_marker(umap_df, "FL1.H")
-p2 <- plot_marker(umap_df, "FL2.H")
-p3 <- plot_marker(umap_df, "FL3.H")
-p4 <- plot_marker(umap_df, "FL4.H")
+p1 <- plot_marker(umap_df, "CD15_FITC_H")
+p2 <- plot_marker(umap_df, "CD45_PE_H")
+p3 <- plot_marker(umap_df, "CD14_PerCP_H")
+p4 <- plot_marker(umap_df, "CD33_APC_H")
 
 gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```

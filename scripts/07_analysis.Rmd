@@ -79,7 +79,7 @@ ggplot(freq_df, aes(x = timepoint_days, y = pct_of_singlets,
 MFI (median fluorescence intensity) tells you how much of a marker is expressed on a per-cell basis within a gated population. We use median rather than mean because the distributions are sometimes skewed.
 
 ```{r extract_mfi}
-fluor_channels <- c("FL1.H", "FL2.H", "FL3.H", "FL4.H")
+fluor_channels <- c("CD15_FITC_H", "CD45_PE_H", "CD14_PerCP_H", "CD33_APC_H")
 
 pop_data <- gs_pop_get_data(gs, "population_of_interest")
 
@@ -91,18 +91,18 @@ mfi_list <- fsApply(pop_data, function(ff) {
 mfi_df <- bind_rows(mfi_list, .id = "sample") %>%
   left_join(meta, by = "sample")
 
-head(mfi_df[, c("sample", "FL1.H", "FL2.H", "treatment")])
+head(mfi_df[, c("sample", "CD15_FITC_H", "CD45_PE_H", "treatment")])
 ```
 
 ```{r plot_mfi, fig.width=5, fig.height=4, warning=FALSE}
-ggplot(mfi_df, aes(x = treatment, y = .data[["FL1.H"]], color = treatment)) +
+ggplot(mfi_df, aes(x = treatment, y = .data[["CD15_FITC_H"]], color = treatment)) +
   geom_jitter(width = 0.1, size = 2.5) +
   stat_summary(fun = median, geom = "crossbar", width = 0.3, color = "black") +
   theme_minimal() +
   labs(
-    y     = "FL1.H MFI",
+    y     = "CD15 MFI",
     x     = NULL,
-    title = "FL1.H expression by GvHD status"
+    title = "CD15 expression by GvHD status"
   ) +
   theme(legend.position = "none")
 ```
@@ -122,7 +122,7 @@ emmeans(model_freq, pairwise ~ treatment)
 ```
 
 ```{r stats_mfi}
-model_mfi <- lmer(mfi_df[["FL1.H"]] ~ treatment + timepoint_days + (1 | patient_id),
+model_mfi <- lmer(mfi_df[["CD15_FITC_H"]] ~ treatment + timepoint_days + (1 | patient_id),
                   data = mfi_df)
 
 emmeans(model_mfi, pairwise ~ treatment)

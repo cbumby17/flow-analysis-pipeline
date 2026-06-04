@@ -49,9 +49,9 @@ Run this on every new dataset before doing anything else:
 keyword(gs_pop_get_data(gs, "root")[[1]], paste0("$P", 1:7, "E"))
 ```
 
-The scatter channels (FSC.H, SSC.H) are `"0,0"` — untransformed linear values, as expected. The fluorescence channels (FL1.H–FL4.H) are `"4,0"`, which means a log transformation was already applied in hardware before the signal was digitized. **Applying another transformation on top would be wrong.**
+The scatter channels (FSC.H, SSC.H) are `"0,0"` — untransformed linear values, as expected. The fluorescence channels (CD15_FITC_H, CD45_PE_H, CD14_PerCP_H, CD33_APC_H) are `"4,0"`, which means a log transformation was already applied in hardware before the signal was digitized. **Applying another transformation on top would be wrong.**
 
-On a modern instrument like the Cytek Aurora, fluorescence channels are stored as linear values (`$PnE = "0,0"`) and you apply arcsinh yourself in R. On older conventional cytometers with analog electronics, the log transformation happens before digitization and arrives baked into the file. The `"4,0"` value tells you the data is on a 4-decade log scale:
+On a modern instrument like the Cytek Aurora, fluorescence channels are stored as linear values (`$PnE = "0,0"`) and you apply the transformation yourself in R. On older conventional cytometers with analog electronics, the log transformation happens before digitization and arrives baked into the file. The `"4,0"` value tells you the data is on a 4-decade log scale:
 
 $$x = \frac{R}{f_1} \log_{10}(y)$$
 
@@ -60,10 +60,10 @@ where $x$ is the stored channel value, $y$ is the original signal, $R$ is the ch
 Since this data is pre-transformed, we skip straight to visualization.
 
 ```{r visualize, fig.width=12, fig.height=6, warning=FALSE, message=FALSE}
-ggcyto(gs[1:6], aes(x = "FL1.H", y = "FL2.H"), subset = "root") +
+ggcyto(gs[1:6], aes(x = "CD15_FITC_H", y = "CD45_PE_H"), subset = "root") +
   geom_hex(bins = 50) +
   facet_wrap(~name) +
-  labs(title = "FL1.H vs FL2.H — log-amplified, no additional transformation needed")
+  labs(title = "CD15 (FITC) vs CD45 (PE) — log-amplified, no additional transformation needed")
 ```
 
 The GatingSet loaded from script 02 is passed through as-is — no transformation applied for this dataset. For Aurora data, you would apply arcsinh to the flowSet before this point and the transformed data would be carried forward here.

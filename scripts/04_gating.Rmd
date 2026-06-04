@@ -35,9 +35,13 @@ get_pop_df <- function(gs, pop) {
 }
 ```
 
-Gating is sequential — each gate is applied within the parent population from the previous step. The order here is: all events → remove debris → remove doublets → gate population of interest. Every downstream number in this analysis is a direct consequence of where these gates are drawn.
+Gating is sequential: each gate is applied within the parent population from the previous step. 
 
-**A note on this dataset:** the GvHD data was collected on a conventional FACScan with only height (H) and one area (A) parameter — specifically FL2.A. Modern instruments record FSC-Area and SSC-Area which are the standard channels for singlet discrimination. We'll work with what this dataset provides, and differences from your own Aurora data are noted throughout.
+The order here is: all events → remove debris → remove doublets → gate population of interest. 
+
+Every downstream number in this analysis is a direct consequence of where these gates are drawn.
+
+**A note on this dataset:** the GvHD data was collected on a conventional FACScan with only height (H) and one area (A) parameter — specifically FL2.A. Modern instruments record FSC-Area and SSC-Area which are the standard channels for singlet discrimination. We'll work with what this dataset provides.
 
 Start with the scatter gate to isolate lymphocytes from debris. Visualize first to understand the data before setting values.
 
@@ -51,6 +55,10 @@ ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
   theme_minimal(base_size = 10) +
   labs(title = "All events — identify lymphocyte cluster before setting gate")
 ```
+
+FSC (forward scatter) measures cell size, meaning larger cells deflect more light forward. SSC (side scatter) measures internal complexity or granularity, so cells with more granules or a more complex internal structure scatter more light to the side. Together they separate the major cell populations without any antibody staining: lymphocytes are small and relatively agranular, so they appear as a tight cluster in the lower-left. Monocytes sit above and to the right (larger, more granular). Debris falls below the lymphocyte cluster as a diffuse cloud near the plot origin.
+
+Look at the plots above and identify that lower-left lymphocyte cluster. The gate boundaries you set should wrap around it while excluding debris below and monocytes above. `rectangleGate()` defines a rectangular region by specifying a minimum and maximum value on each axis: `c(100, 850)` means "keep events where FSC.H is between 100 and 850", and `c(0, 500)` means "keep events where SSC.H is between 0 and 500". Read the axis values off your visualization to decide where the boundaries should fall for your data — they will be different for every instrument and panel.
 
 ```{r scatter_gate}
 scatter_gate <- rectangleGate(
@@ -74,57 +82,71 @@ ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
   labs(title = "Lymphocyte gate (red box)")
 ```
 
-For singlet discrimination, modern instruments use FSC-Height vs FSC-Area: single cells fall on a tight diagonal, doublets appear above it. This dataset doesn't have FSC-Area, so we use FL2.H vs FL2.A — the PE channel height and area — which captures the same doublet-exclusion principle. On your Aurora data, use `FSC.A` vs `FSC.H` instead.
+For singlet discrimination, modern instruments use FSC-Height vs FSC-Area: single cells fall on a tight diagonal, doublets appear above it. This dataset doesn't have FSC-Area, so we use CD45_PE_H vs CD45_PE_A — the height and area measurements of the CD45 (PE) channel — which captures the same doublet-exclusion principle. On spectral data, use `FSC.A` vs `FSC.H` instead.
 
 ```{r singlet_vis, fig.width=12, fig.height=16, warning=FALSE}
 df_lymph <- get_pop_df(gs, "lymphocytes")
 
-ggplot(df_lymph, aes(x = FL2.A, y = FL2.H)) +
+ggplot(df_lymph, aes(x = CD45_PE_A, y = CD45_PE_H)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c() +
   facet_wrap(~sample, ncol = 5) +
   theme_minimal(base_size = 10) +
-  labs(title = "FL2.A vs FL2.H — singlet population falls along the diagonal")
+  labs(title = "CD45 PE-Area vs PE-Height — singlet population falls along the diagonal")
 ```
 
 ```{r singlet_gate}
 singlet_gate <- rectangleGate(
-  filterId = "singlets",
-  "FL2.A"  = c(0, 900),
-  "FL2.H"  = c(1, 5000)
+  filterId      = "singlets",
+  "CD45_PE_A"   = c(0, 900),
+  "CD45_PE_H"   = c(1, 5000)
 )
 
 gs_pop_add(gs, singlet_gate, parent = "lymphocytes")
 recompute(gs)
 ```
 
-The GvHD panel doesn't include a viability dye. In a real experiment you would gate out dead cells here using a viability dye channel — dead cells stain brightly, live cells are dim or negative. Since we can't demonstrate this with the GvHD data, we proceed directly to the population gate.
+The GvHD panel doesn't include a viability dye. In a real experiment you would gate out dead cells here using a viability dye channel.  Dead cells stain brightly, live cells are dim or negative. Since we can't demonstrate this with the GvHD data, we proceed directly to the population gate.
 
-> For Aurora data, add a live/dead gate after singlets:
+> For spectral data, add a live/dead gate after singlets:
 > ```r
 > live_gate <- rectangleGate(filterId = "live", "V525.A" = c(-Inf, 2))
 > gs_pop_add(gs, live_gate, parent = "singlets")
 > recompute(gs)
 > ```
 
-Now gate on your population of interest. Here we gate on FL1.H-high cells (the FITC channel).
+## Choosing channels for your population gate
+
+The channels you plot and gate on should correspond to the markers that define your population of interest. There is no universal answer — it depends entirely on your panel design.
+
+**Start from biology, not from the data.** Before looking at any plots, you should already know which markers your population expresses and which fluorochrome those markers were conjugated to. If you are gating CD8+ T cells, you need the channel your CD8 antibody is on. Looking at plots first and drawing gates around whatever cluster looks interesting is not a sound approach.
+
+**Use markers that clearly separate your population.** The best gate is one where your population forms a distinct cluster with visible empty space between it and everything else. If your population falls in the middle of a continuous smear on a given channel, any gate boundary you draw there will be arbitrary.
+
+**Check consistency across samples.** Scan all samples after setting values to confirm the gate captures the same population in each one. If the population shifts between samples due to staining variability, tissue differences, or batch effects, a fixed gate will be systematically wrong for some of them.
+
+**Back-gate to verify.** After gating, plot the gated population back onto FSC vs SSC. If those cells don't fall where you'd expect that cell type to sit, the gate is probably capturing the wrong thing.
+
+In this tutorial we gate on CD15_FITC_H vs CD33_APC_H. CD15 marks granulocytes and CD33 marks myeloid cells broadly, so CD15-high events here represent the granulocyte population. In your own experiment, replace these channels with the ones corresponding to your markers of interest.
+
+Now gate on the CD15+ granulocyte population.
 
 ```{r population_vis, fig.width=12, fig.height=16, warning=FALSE}
 df_sing <- get_pop_df(gs, "singlets")
 
-ggplot(df_sing, aes(x = FL1.H, y = FL4.H)) +
+ggplot(df_sing, aes(x = CD15_FITC_H, y = CD33_APC_H)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c() +
   facet_wrap(~sample, ncol = 5) +
   theme_minimal(base_size = 10) +
-  labs(title = "FL1.H vs FL4.H — gate on your population of interest")
+  labs(title = "CD15 (FITC) vs CD33 (APC) — gate on your population of interest")
 ```
 
 ```{r population_gate}
 population_gate <- rectangleGate(
   filterId         = "population_of_interest",
-  "FL1.H"          = c(1000, 10000),
-  "FL4.H"          = c(1, 10000)
+  "CD15_FITC_H"    = c(1000, 10000),
+  "CD33_APC_H"     = c(1, 10000)
 )
 
 gs_pop_add(gs, population_gate, parent = "singlets")
