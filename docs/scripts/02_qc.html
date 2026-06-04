@@ -1509,6 +1509,7 @@ Transformation →</a></p>
 </div>
 <hr />
 <pre class="r"><code>library(flowCore)
+library(flowWorkspace)
 library(PeacoQC)
 library(tidyverse)</code></pre>
 <pre class="r"><code>data(GvHD)
@@ -1575,9 +1576,9 @@ sample. Losing a small fraction is expected — anything over 20% is worth
 investigating further.</p>
 <p>If a sample exceeds that threshold, go back to the time plots and
 look at <em>where</em> the instability occurred. A brief blip at the
-very start of acquisition is common and less concerning — the flow rate
+very start of acquisition is common and less concerning as the flow rate
 often takes a moment to stabilise as the sample first enters the system.
-Instability spread throughout the run is more serious.</p>
+However, instability spread throughout the run is more serious.</p>
 <p>Also check whether the remaining cell count is still adequate. Losing
 25% of 100,000 events is generally fine; losing 25% of 3,000 may leave
 you with too few cells for reliable gating and statistics.</p>
@@ -1591,8 +1592,8 @@ methods. If cells are still viable, reacquisition is worth
 considering.</li>
 </ul>
 <p>The most important principle is that exclusion decisions must be made
-before looking at your results and documented regardless of which way
-you go.</p>
+and documented before looking at your results, regardless of what you
+choose to do.</p>
 <pre class="r"><code>events_before &lt;- as.integer(fsApply(fs, nrow))
 events_after  &lt;- as.integer(fsApply(fs_qc, nrow))
 
@@ -1639,10 +1640,10 @@ data.frame(
 ## 34 s10a06  24656 22406         90.9
 ## 35 s10a07  25601 25601        100.0</code></pre>
 <p>Margin events are events where the detector recorded a value at the
-maximum of its range — the true signal was even higher and got clipped.
-We remove them because the actual value is unknown. This is distinct
-from what PeacoQC catches; PeacoQC looks at temporal instability, not
-ceiling effects.</p>
+maximum of its range, meaning the true signal was even higher and got
+clipped. As a result, we remove them because the actual value is
+unknown. This is distinct from what PeacoQC catches; PeacoQC looks at
+temporal instability, not ceiling effects.</p>
 <pre class="r"><code>remove_margin_events &lt;- function(ff) {
   channel_max &lt;- parameters(ff)@data$maxRange
   names(channel_max) &lt;- colnames(ff)
@@ -1695,58 +1696,18 @@ fs_clean &lt;- fsApply(fs_qc, remove_margin_events)</code></pre>
 ## 33 s10a05        25110            98.4
 ## 34 s10a06        22101            89.6
 ## 35 s10a07        25349            99.0</code></pre>
-<p>We save each QC-passed frame as an individual FCS file. The
-<code>flowSet</code> class uses reference-based storage that doesn’t
-serialize cleanly with <code>saveRDS</code>, so saving individual frames
-with <code>write.FCS()</code> is the correct approach at this stage. We
-also save the metadata as a CSV so the next script can reattach it.</p>
-<pre class="r"><code>dir.create(&quot;data/processed/qc&quot;, recursive = TRUE, showWarnings = FALSE)
-
-fsApply(fs_clean, function(ff) {
-  write.FCS(ff, file.path(&quot;data/processed/qc&quot;, paste0(identifier(ff), &quot;.fcs&quot;)))
-})</code></pre>
-<pre><code>##        [,1]                          
-## s5a01  &quot;data/processed/qc/s5a01.fcs&quot; 
-## s5a02  &quot;data/processed/qc/s5a02.fcs&quot; 
-## s5a03  &quot;data/processed/qc/s5a03.fcs&quot; 
-## s5a04  &quot;data/processed/qc/s5a04.fcs&quot; 
-## s5a05  &quot;data/processed/qc/s5a05.fcs&quot; 
-## s5a06  &quot;data/processed/qc/s5a06.fcs&quot; 
-## s5a07  &quot;data/processed/qc/s5a07.fcs&quot; 
-## s6a01  &quot;data/processed/qc/s6a01.fcs&quot; 
-## s6a02  &quot;data/processed/qc/s6a02.fcs&quot; 
-## s6a03  &quot;data/processed/qc/s6a03.fcs&quot; 
-## s6a04  &quot;data/processed/qc/s6a04.fcs&quot; 
-## s6a05  &quot;data/processed/qc/s6a05.fcs&quot; 
-## s6a06  &quot;data/processed/qc/s6a06.fcs&quot; 
-## s6a07  &quot;data/processed/qc/s6a07.fcs&quot; 
-## s7a01  &quot;data/processed/qc/s7a01.fcs&quot; 
-## s7a02  &quot;data/processed/qc/s7a02.fcs&quot; 
-## s7a03  &quot;data/processed/qc/s7a03.fcs&quot; 
-## s7a04  &quot;data/processed/qc/s7a04.fcs&quot; 
-## s7a05  &quot;data/processed/qc/s7a05.fcs&quot; 
-## s7a06  &quot;data/processed/qc/s7a06.fcs&quot; 
-## s7a07  &quot;data/processed/qc/s7a07.fcs&quot; 
-## s9a01  &quot;data/processed/qc/s9a01.fcs&quot; 
-## s9a02  &quot;data/processed/qc/s9a02.fcs&quot; 
-## s9a03  &quot;data/processed/qc/s9a03.fcs&quot; 
-## s9a04  &quot;data/processed/qc/s9a04.fcs&quot; 
-## s9a05  &quot;data/processed/qc/s9a05.fcs&quot; 
-## s9a06  &quot;data/processed/qc/s9a06.fcs&quot; 
-## s9a07  &quot;data/processed/qc/s9a07.fcs&quot; 
-## s10a01 &quot;data/processed/qc/s10a01.fcs&quot;
-## s10a02 &quot;data/processed/qc/s10a02.fcs&quot;
-## s10a03 &quot;data/processed/qc/s10a03.fcs&quot;
-## s10a04 &quot;data/processed/qc/s10a04.fcs&quot;
-## s10a05 &quot;data/processed/qc/s10a05.fcs&quot;
-## s10a06 &quot;data/processed/qc/s10a06.fcs&quot;
-## s10a07 &quot;data/processed/qc/s10a07.fcs&quot;</code></pre>
-<pre class="r"><code>meta_out &lt;- pData(fs)
-rownames(meta_out) &lt;- paste0(rownames(meta_out), &quot;.fcs&quot;)
-write.csv(meta_out, &quot;data/processed/qc/GvHD_metadata.csv&quot;)
-
-cat(&quot;Saved&quot;, length(fs_clean), &quot;QC-filtered FCS files and metadata to data/processed/qc/\n&quot;)</code></pre>
-<pre><code>## Saved 35 QC-filtered FCS files and metadata to data/processed/qc/</code></pre>
+<p>We convert the QC-cleaned flowSet to a GatingSet, which is the
+standard persistence format in the <code>flowWorkspace</code> ecosystem.
+All downstream scripts load from this. Even with no gates applied yet,
+<code>save_gs()</code> correctly serializes the data and metadata.</p>
+<pre class="r"><code>dir.create(&quot;data/processed&quot;, recursive = TRUE, showWarnings = FALSE)
+gs &lt;- GatingSet(fs_clean)
+unlink(&quot;data/processed/GvHD_gs_qc&quot;, recursive = TRUE)
+save_gs(gs, path = &quot;data/processed/GvHD_gs_qc&quot;)</code></pre>
+<pre><code>## Done
+## To reload it, use &#39;load_gs&#39; function</code></pre>
+<pre class="r"><code>cat(&quot;QC-cleaned GatingSet saved to data/processed/GvHD_gs_qc\n&quot;)</code></pre>
+<pre><code>## QC-cleaned GatingSet saved to data/processed/GvHD_gs_qc</code></pre>
 <hr>
 <div style="display:flex; gap:8px; margin-top:1.5em;">
 <p><a href="../index.html" class="btn btn-default btn-sm">← Home</a>

@@ -23,13 +23,7 @@ library(tidyverse)
 ```
 
 ```{r load, message=FALSE}
-qc_files <- list.files("data/processed/qc", pattern = "fcs$", full.names = TRUE)
-frames <- lapply(qc_files, read.FCS, transformation = FALSE, alter.names = TRUE)
-names(frames) <- basename(qc_files)
-fs <- as(frames, "flowSet")
-
-meta <- read.csv("data/processed/qc/GvHD_metadata.csv", row.names = 1)
-pData(fs) <- meta[sampleNames(fs), ]
+gs <- load_gs("data/processed/GvHD_gs_qc")
 ```
 
 ## Why transformation is necessary
@@ -52,7 +46,7 @@ The GvHD dataset was collected on a conventional cytometer with hardware log amp
 Before applying any transformation, check the `$PnE` keyword to confirm how the data is stored. `$PnE = "0,0"` means untransformed linear — you apply arcsinh yourself. Anything else means a transformation was already applied at acquisition or export.
 
 ```{r check_pne}
-keyword(fs[[1]], paste0("$P", 1:7, "E"))
+keyword(gs_pop_get_data(gs, "root")[[1]], paste0("$P", 1:7, "E"))
 ```
 
 For this dataset, the scatter channels (FSC.H, SSC.H) are `"0,0"` — linear, as expected. The fluorescence channels (FL1.H, FL2.H, FL3.H, FL4.H) are `"4,0"`, which means the data was collected through a log amplifier and stored on a 4-decade log scale. **This data is already transformed.** Applying arcsinh on top of it would be wrong and would make the data difficult to interpret.
@@ -74,10 +68,9 @@ ggcyto(fs[1:6], aes(x = "FL1.H", y = "FL2.H")) +
   labs(title = "FL1.H vs FL2.H — log-amplified, no additional transformation needed")
 ```
 
-We convert to a GatingSet at this step, which is how `flowWorkspace` persists the data for all downstream gating, UMAP, and analysis scripts. Even with no gates applied yet, `save_gs()` correctly serializes the flowSet data. When working with Aurora data where transformation is applied, the transformed flowSet would be converted here.
+The GatingSet loaded from script 02 is passed through as-is — no transformation applied for this dataset. For Aurora data, you would apply arcsinh to the flowSet before this point and the transformed data would be carried forward here.
 
 ```{r save}
-gs <- GatingSet(fs)
 unlink("data/processed/GvHD_tcell_gs_base", recursive = TRUE)
 save_gs(gs, path = "data/processed/GvHD_tcell_gs_base")
 cat("GatingSet saved to data/processed/GvHD_tcell_gs_base\n")

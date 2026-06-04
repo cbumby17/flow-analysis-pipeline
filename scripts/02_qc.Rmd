@@ -17,6 +17,7 @@ output:
 
 ```{r libraries, message=FALSE, warning=FALSE}
 library(flowCore)
+library(flowWorkspace)
 library(PeacoQC)
 library(tidyverse)
 ```
@@ -79,14 +80,14 @@ fs_qc <- fsApply(fs, function(ff) {
 
 After running PeacoQC, check how many events were removed from each sample. Losing a small fraction is expected — anything over 20% is worth investigating further.
 
-If a sample exceeds that threshold, go back to the time plots and look at *where* the instability occurred. A brief blip at the very start of acquisition is common and less concerning — the flow rate often takes a moment to stabilise as the sample first enters the system. Instability spread throughout the run is more serious.
+If a sample exceeds that threshold, go back to the time plots and look at *where* the instability occurred. A brief blip at the very start of acquisition is common and less concerning as the flow rate often takes a moment to stabilise as the sample first enters the system. However, instability spread throughout the run is more serious.
 
 Also check whether the remaining cell count is still adequate. Losing 25% of 100,000 events is generally fine; losing 25% of 3,000 may leave you with too few cells for reliable gating and statistics.
 
 - **If instability was brief and cell count is adequate:** keep the sample, flag it, and note the deviation in your experiment metadata.
 - **If instability was severe or cell count is insufficient:** exclude the sample and document it in your methods. If cells are still viable, reacquisition is worth considering.
 
-The most important principle is that exclusion decisions must be made before looking at your results and documented regardless of which way you go.
+The most important principle is that exclusion decisions must be made and documented before looking at your results, regardless of what you choose to do.
 
 ```{r qc_summary}
 events_before <- as.integer(fsApply(fs, nrow))
@@ -100,7 +101,7 @@ data.frame(
 )
 ```
 
-Margin events are events where the detector recorded a value at the maximum of its range — the true signal was even higher and got clipped. We remove them because the actual value is unknown. This is distinct from what PeacoQC catches; PeacoQC looks at temporal instability, not ceiling effects.
+Margin events are events where the detector recorded a value at the maximum of its range, meaning the true signal was even higher and got clipped. As a result, we remove them because the actual value is unknown. This is distinct from what PeacoQC catches; PeacoQC looks at temporal instability, not ceiling effects.
 
 ```{r margin_events}
 remove_margin_events <- function(ff) {
@@ -124,20 +125,14 @@ data.frame(
 )
 ```
 
-We save each QC-passed frame as an individual FCS file. The `flowSet` class uses reference-based storage that doesn't serialize cleanly with `saveRDS`, so saving individual frames with `write.FCS()` is the correct approach at this stage. We also save the metadata as a CSV so the next script can reattach it.
+We convert the QC-cleaned flowSet to a GatingSet, which is the standard persistence format in the `flowWorkspace` ecosystem. All downstream scripts load from this. Even with no gates applied yet, `save_gs()` correctly serializes the data and metadata.
 
 ```{r save}
-dir.create("data/processed/qc", recursive = TRUE, showWarnings = FALSE)
-
-fsApply(fs_clean, function(ff) {
-  write.FCS(ff, file.path("data/processed/qc", paste0(identifier(ff), ".fcs")))
-})
-
-meta_out <- pData(fs)
-rownames(meta_out) <- paste0(rownames(meta_out), ".fcs")
-write.csv(meta_out, "data/processed/qc/GvHD_metadata.csv")
-
-cat("Saved", length(fs_clean), "QC-filtered FCS files and metadata to data/processed/qc/\n")
+dir.create("data/processed", recursive = TRUE, showWarnings = FALSE)
+gs <- GatingSet(fs_clean)
+unlink("data/processed/GvHD_gs_qc", recursive = TRUE)
+save_gs(gs, path = "data/processed/GvHD_gs_qc")
+cat("QC-cleaned GatingSet saved to data/processed/GvHD_gs_qc\n")
 ```
 
 <hr>
