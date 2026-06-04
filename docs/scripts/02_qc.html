@@ -1549,8 +1549,8 @@ ggplot(time_df, aes(x = Time, y = FL1.H)) +
 events based on signal consistency over time. We run it on each sample
 and collect the cleaned frames.</p>
 <blockquote>
-<p><strong>Spectral flow note:</strong> On Aurora data, run PeacoQC on a
-representative subset of unmixed channels rather than all of them. A
+<p><strong>Spectral flow note:</strong> On spectral data, run PeacoQC on
+a representative subset of unmixed channels rather than all of them. A
 channel with very few positive cells can produce noisy signal that
 PeacoQC flags as instability when it isn’t. Choose channels that have
 enough positive events across most samples.</p>
@@ -1572,7 +1572,27 @@ fs_qc &lt;- fsApply(fs, function(ff) {
 })</code></pre>
 <p>After running PeacoQC, check how many events were removed from each
 sample. Losing a small fraction is expected — anything over 20% is worth
-going back to look at the time plots for that sample.</p>
+investigating further.</p>
+<p>If a sample exceeds that threshold, go back to the time plots and
+look at <em>where</em> the instability occurred. A brief blip at the
+very start of acquisition is common and less concerning — the flow rate
+often takes a moment to stabilise as the sample first enters the system.
+Instability spread throughout the run is more serious.</p>
+<p>Also check whether the remaining cell count is still adequate. Losing
+25% of 100,000 events is generally fine; losing 25% of 3,000 may leave
+you with too few cells for reliable gating and statistics.</p>
+<ul>
+<li><strong>If instability was brief and cell count is
+adequate:</strong> keep the sample, flag it, and note the deviation in
+your experiment metadata.</li>
+<li><strong>If instability was severe or cell count is
+insufficient:</strong> exclude the sample and document it in your
+methods. If cells are still viable, reacquisition is worth
+considering.</li>
+</ul>
+<p>The most important principle is that exclusion decisions must be made
+before looking at your results and documented regardless of which way
+you go.</p>
 <pre class="r"><code>events_before &lt;- as.integer(fsApply(fs, nrow))
 events_after  &lt;- as.integer(fsApply(fs_qc, nrow))
 

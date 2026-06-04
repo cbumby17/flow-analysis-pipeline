@@ -57,7 +57,7 @@ ggplot(time_df, aes(x = Time, y = FL1.H)) +
 
 PeacoQC automates this detection. It identifies and removes anomalous events based on signal consistency over time. We run it on each sample and collect the cleaned frames.
 
-> **Spectral flow note:** On Aurora data, run PeacoQC on a representative subset of unmixed channels rather than all of them. A channel with very few positive cells can produce noisy signal that PeacoQC flags as instability when it isn't. Choose channels that have enough positive events across most samples.
+> **Spectral flow note:** On spectral data, run PeacoQC on a representative subset of unmixed channels rather than all of them. A channel with very few positive cells can produce noisy signal that PeacoQC flags as instability when it isn't. Choose channels that have enough positive events across most samples.
 
 ```{r peaco_qc, message=FALSE, warning=FALSE, results='hide'}
 dir.create("output/qc", recursive = TRUE, showWarnings = FALSE)
@@ -77,7 +77,16 @@ fs_qc <- fsApply(fs, function(ff) {
 })
 ```
 
-After running PeacoQC, check how many events were removed from each sample. Losing a small fraction is expected — anything over 20% is worth going back to look at the time plots for that sample.
+After running PeacoQC, check how many events were removed from each sample. Losing a small fraction is expected — anything over 20% is worth investigating further.
+
+If a sample exceeds that threshold, go back to the time plots and look at *where* the instability occurred. A brief blip at the very start of acquisition is common and less concerning — the flow rate often takes a moment to stabilise as the sample first enters the system. Instability spread throughout the run is more serious.
+
+Also check whether the remaining cell count is still adequate. Losing 25% of 100,000 events is generally fine; losing 25% of 3,000 may leave you with too few cells for reliable gating and statistics.
+
+- **If instability was brief and cell count is adequate:** keep the sample, flag it, and note the deviation in your experiment metadata.
+- **If instability was severe or cell count is insufficient:** exclude the sample and document it in your methods. If cells are still viable, reacquisition is worth considering.
+
+The most important principle is that exclusion decisions must be made before looking at your results and documented regardless of which way you go.
 
 ```{r qc_summary}
 events_before <- as.integer(fsApply(fs, nrow))
