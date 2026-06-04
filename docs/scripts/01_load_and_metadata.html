@@ -1500,250 +1500,264 @@ border-radius: 0px;
 </div>
 
 
-<blockquote>
-<p><strong>Navigation:</strong> <a href="../index.html">Home</a> | <a href="02_qc.html">Next: QC →</a></p>
-</blockquote>
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
+<p><a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="00_data_structures.html" class="btn btn-default btn-sm">← Prev:
+Data Structures</a>
+<a href="02_qc.html" class="btn btn-primary btn-sm">Next: QC →</a></p>
+</div>
 <hr />
 <pre class="r"><code>library(flowCore)
 library(tidyverse)</code></pre>
-<p>We start by reading the unmixed FCS files from
-<code>data/unmixed/</code>. We name each frame by its filename
-immediately so that when we build the flowSet,
-<code>sampleNames()</code> returns something meaningful rather than the
-default numeric index. This naming matters because we’ll use the
-filename as the join key when we attach metadata.</p>
-<pre class="r"><code>fcs_dir &lt;- &quot;data/unmixed&quot;
-fcs_files &lt;- list.files(fcs_dir, pattern = &quot;\\.fcs$&quot;, full.names = TRUE)
-
-frames &lt;- lapply(fcs_files, read.FCS, transformation = FALSE, alter.names = TRUE)
-names(frames) &lt;- basename(fcs_files)
-
-fs &lt;- as(frames, &quot;flowSet&quot;)
-fs</code></pre>
+<div id="setting-up-a-working-directory" class="section level2">
+<h2>Setting up a working directory</h2>
+<p>Before running anything, set a consistent working directory. Scripts
+02 onwards save processed files, and each script must be able to find
+files created by the previous one. Pick a folder and use it throughout
+the tutorial.</p>
+<pre class="r"><code># Create a folder for this tutorial and set it as your working directory.
+# You can change this path to wherever you like.
+dir.create(&quot;~/flow_tutorial&quot;, showWarnings = FALSE)
+setwd(&quot;~/flow_tutorial&quot;)</code></pre>
+<p>You only need to create the folder once. Each time you restart R, run
+<code>setwd(&quot;~/flow_tutorial&quot;)</code> before continuing.</p>
+<hr />
+</div>
+<div id="loading-the-example-data" class="section level2">
+<h2>Loading the example data</h2>
+<p>This tutorial uses the <code>GvHD</code> dataset built into the
+<code>flowCore</code> package — a longitudinal study of bone marrow
+transplant patients. Five patients were each measured at seven visits,
+giving 35 samples total. The panel is a conventional 4-color
+FITC/PE/PerCP/APC setup run on a FACScan. Differences from Cytek Aurora
+spectral data are noted throughout.</p>
+<pre class="r"><code>data(GvHD)
+GvHD</code></pre>
 <pre><code>## A flowSet with 35 experiments.
 ## 
-## column names(8): FSC.H SSC.H ... FL4.H Time</code></pre>
-<p>Load the two metadata files separately, then join them on
-<code>experiment_id</code>. Keeping them separate until this point makes
-it easier to validate each one before merging.</p>
-<pre class="r"><code>sample_meta &lt;- read_csv(&quot;metadata/sample_metadata.csv&quot;)
-experiment_meta &lt;- read_csv(&quot;metadata/experiment_metadata.csv&quot;)
-
-meta &lt;- left_join(sample_meta, experiment_meta, by = &quot;experiment_id&quot;) |&gt; as.data.frame()</code></pre>
-<p>Before attaching metadata to the flowSet, reorder its rows to match
-<code>sampleNames(fs)</code> exactly. <code>pData()</code> expects a
-one-to-one correspondence and does not reorder automatically.</p>
-<pre class="r"><code>meta_ordered &lt;- meta[match(sampleNames(fs), meta$filename), ]
-rownames(meta_ordered) &lt;- meta_ordered$filename
-
-pData(fs) &lt;- meta_ordered
-pData(fs)</code></pre>
-<pre><code>##                filename experiment_id patient_id treatment gvhd_grade
-## P01_V01.fcs P01_V01.fcs    GvHD_tcell        P01      GvHD          3
-## P01_V02.fcs P01_V02.fcs    GvHD_tcell        P01      GvHD          3
-## P01_V03.fcs P01_V03.fcs    GvHD_tcell        P01      GvHD          3
-## P01_V04.fcs P01_V04.fcs    GvHD_tcell        P01      GvHD          3
-## P01_V05.fcs P01_V05.fcs    GvHD_tcell        P01      GvHD          3
-## P01_V06.fcs P01_V06.fcs    GvHD_tcell        P01      GvHD          3
-## P01_V07.fcs P01_V07.fcs    GvHD_tcell        P01      GvHD          3
-## P02_V01.fcs P02_V01.fcs    GvHD_tcell        P02      GvHD          3
-## P02_V02.fcs P02_V02.fcs    GvHD_tcell        P02      GvHD          3
-## P02_V03.fcs P02_V03.fcs    GvHD_tcell        P02      GvHD          3
-## P02_V04.fcs P02_V04.fcs    GvHD_tcell        P02      GvHD          3
-## P02_V05.fcs P02_V05.fcs    GvHD_tcell        P02      GvHD          3
-## P02_V06.fcs P02_V06.fcs    GvHD_tcell        P02      GvHD          3
-## P02_V07.fcs P02_V07.fcs    GvHD_tcell        P02      GvHD          3
-## P03_V01.fcs P03_V01.fcs    GvHD_tcell        P03      GvHD          3
-## P03_V02.fcs P03_V02.fcs    GvHD_tcell        P03      GvHD          3
-## P03_V03.fcs P03_V03.fcs    GvHD_tcell        P03      GvHD          3
-## P03_V04.fcs P03_V04.fcs    GvHD_tcell        P03      GvHD          3
-## P03_V05.fcs P03_V05.fcs    GvHD_tcell        P03      GvHD          3
-## P03_V06.fcs P03_V06.fcs    GvHD_tcell        P03      GvHD          3
-## P03_V07.fcs P03_V07.fcs    GvHD_tcell        P03      GvHD          3
-## P04_V01.fcs P04_V01.fcs    GvHD_tcell        P04      GvHD          3
-## P04_V02.fcs P04_V02.fcs    GvHD_tcell        P04      GvHD          3
-## P04_V03.fcs P04_V03.fcs    GvHD_tcell        P04      GvHD          3
-## P04_V04.fcs P04_V04.fcs    GvHD_tcell        P04      GvHD          3
-## P04_V05.fcs P04_V05.fcs    GvHD_tcell        P04      GvHD          3
-## P04_V06.fcs P04_V06.fcs    GvHD_tcell        P04      GvHD          3
-## P04_V07.fcs P04_V07.fcs    GvHD_tcell        P04      GvHD          3
-## P05_V01.fcs P05_V01.fcs    GvHD_tcell        P05      GvHD          1
-## P05_V02.fcs P05_V02.fcs    GvHD_tcell        P05      GvHD          1
-## P05_V03.fcs P05_V03.fcs    GvHD_tcell        P05      GvHD          1
-## P05_V04.fcs P05_V04.fcs    GvHD_tcell        P05      GvHD          1
-## P05_V05.fcs P05_V05.fcs    GvHD_tcell        P05      GvHD          1
-## P05_V06.fcs P05_V06.fcs    GvHD_tcell        P05      GvHD          1
-## P05_V07.fcs P05_V07.fcs    GvHD_tcell        P05      GvHD          1
-##             timepoint_days sample_source panel date         operator instrument
-## P01_V01.fcs             -6           PBL tcell   NA Srivastava_et_al    FACScan
-## P01_V02.fcs              0           PBL tcell   NA Srivastava_et_al    FACScan
-## P01_V03.fcs              6           PBL tcell   NA Srivastava_et_al    FACScan
-## P01_V04.fcs             12           PBL tcell   NA Srivastava_et_al    FACScan
-## P01_V05.fcs             19           PBL tcell   NA Srivastava_et_al    FACScan
-## P01_V06.fcs             26           PBL tcell   NA Srivastava_et_al    FACScan
-## P01_V07.fcs             33           PBL tcell   NA Srivastava_et_al    FACScan
-## P02_V01.fcs             -8           PBL tcell   NA Srivastava_et_al    FACScan
-## P02_V02.fcs              0           PBL tcell   NA Srivastava_et_al    FACScan
-## P02_V03.fcs              5           PBL tcell   NA Srivastava_et_al    FACScan
-## P02_V04.fcs             12           PBL tcell   NA Srivastava_et_al    FACScan
-## P02_V05.fcs             19           PBL tcell   NA Srivastava_et_al    FACScan
-## P02_V06.fcs             27           PBL tcell   NA Srivastava_et_al    FACScan
-## P02_V07.fcs             32           PBL tcell   NA Srivastava_et_al    FACScan
-## P03_V01.fcs             -4           PBL tcell   NA Srivastava_et_al    FACScan
-## P03_V02.fcs              0           PBL tcell   NA Srivastava_et_al    FACScan
-## P03_V03.fcs              7           PBL tcell   NA Srivastava_et_al    FACScan
-## P03_V04.fcs             14           PBL tcell   NA Srivastava_et_al    FACScan
-## P03_V05.fcs             21           PBL tcell   NA Srivastava_et_al    FACScan
-## P03_V06.fcs             28           PBL tcell   NA Srivastava_et_al    FACScan
-## P03_V07.fcs             35           PBL tcell   NA Srivastava_et_al    FACScan
-## P04_V01.fcs             -6           PBL tcell   NA Srivastava_et_al    FACScan
-## P04_V02.fcs              0           PBL tcell   NA Srivastava_et_al    FACScan
-## P04_V03.fcs              6           PBL tcell   NA Srivastava_et_al    FACScan
-## P04_V04.fcs             11           PBL tcell   NA Srivastava_et_al    FACScan
-## P04_V05.fcs             18           PBL tcell   NA Srivastava_et_al    FACScan
-## P04_V06.fcs             25           PBL tcell   NA Srivastava_et_al    FACScan
-## P04_V07.fcs             32           PBL tcell   NA Srivastava_et_al    FACScan
-## P05_V01.fcs             -6           PBL tcell   NA Srivastava_et_al    FACScan
-## P05_V02.fcs              0           PBL tcell   NA Srivastava_et_al    FACScan
-## P05_V03.fcs              6           PBL tcell   NA Srivastava_et_al    FACScan
-## P05_V04.fcs             13           PBL tcell   NA Srivastava_et_al    FACScan
-## P05_V05.fcs             20           PBL tcell   NA Srivastava_et_al    FACScan
-## P05_V06.fcs             27           PBL tcell   NA Srivastava_et_al    FACScan
-## P05_V07.fcs             34           PBL tcell   NA Srivastava_et_al    FACScan
-##               panel_name panel_version unmixing_operator unmixing_date
-## P01_V01.fcs T Cell Panel          v1.0                NA            NA
-## P01_V02.fcs T Cell Panel          v1.0                NA            NA
-## P01_V03.fcs T Cell Panel          v1.0                NA            NA
-## P01_V04.fcs T Cell Panel          v1.0                NA            NA
-## P01_V05.fcs T Cell Panel          v1.0                NA            NA
-## P01_V06.fcs T Cell Panel          v1.0                NA            NA
-## P01_V07.fcs T Cell Panel          v1.0                NA            NA
-## P02_V01.fcs T Cell Panel          v1.0                NA            NA
-## P02_V02.fcs T Cell Panel          v1.0                NA            NA
-## P02_V03.fcs T Cell Panel          v1.0                NA            NA
-## P02_V04.fcs T Cell Panel          v1.0                NA            NA
-## P02_V05.fcs T Cell Panel          v1.0                NA            NA
-## P02_V06.fcs T Cell Panel          v1.0                NA            NA
-## P02_V07.fcs T Cell Panel          v1.0                NA            NA
-## P03_V01.fcs T Cell Panel          v1.0                NA            NA
-## P03_V02.fcs T Cell Panel          v1.0                NA            NA
-## P03_V03.fcs T Cell Panel          v1.0                NA            NA
-## P03_V04.fcs T Cell Panel          v1.0                NA            NA
-## P03_V05.fcs T Cell Panel          v1.0                NA            NA
-## P03_V06.fcs T Cell Panel          v1.0                NA            NA
-## P03_V07.fcs T Cell Panel          v1.0                NA            NA
-## P04_V01.fcs T Cell Panel          v1.0                NA            NA
-## P04_V02.fcs T Cell Panel          v1.0                NA            NA
-## P04_V03.fcs T Cell Panel          v1.0                NA            NA
-## P04_V04.fcs T Cell Panel          v1.0                NA            NA
-## P04_V05.fcs T Cell Panel          v1.0                NA            NA
-## P04_V06.fcs T Cell Panel          v1.0                NA            NA
-## P04_V07.fcs T Cell Panel          v1.0                NA            NA
-## P05_V01.fcs T Cell Panel          v1.0                NA            NA
-## P05_V02.fcs T Cell Panel          v1.0                NA            NA
-## P05_V03.fcs T Cell Panel          v1.0                NA            NA
-## P05_V04.fcs T Cell Panel          v1.0                NA            NA
-## P05_V05.fcs T Cell Panel          v1.0                NA            NA
-## P05_V06.fcs T Cell Panel          v1.0                NA            NA
-## P05_V07.fcs T Cell Panel          v1.0                NA            NA
-##                                                                                                                                                                                                                                                                                                                     notes
-## P01_V01.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P01_V02.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P01_V03.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P01_V04.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P01_V05.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P01_V06.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P01_V07.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P02_V01.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P02_V02.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P02_V03.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P02_V04.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P02_V05.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P02_V06.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P02_V07.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P03_V01.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P03_V02.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P03_V03.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P03_V04.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P03_V05.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P03_V06.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P03_V07.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P04_V01.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P04_V02.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P04_V03.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P04_V04.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P04_V05.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P04_V06.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P04_V07.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P05_V01.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P05_V02.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P05_V03.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P05_V04.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P05_V05.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P05_V06.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-## P05_V07.fcs Teaching dataset: Srivastava et al. GvHD study via flowCore package. Grade 0 = no GvHD; Grade 1 = mild; Grade 3 = severe. Days = days post bone marrow transplant. Conventional cytometer data: $PnE is &#39;4,0&#39; for fluorescence channels (log-amplified at acquisition). Do not apply arcsinh — see script 03.
-##                    name
-## P01_V01.fcs P01_V01.fcs
-## P01_V02.fcs P01_V02.fcs
-## P01_V03.fcs P01_V03.fcs
-## P01_V04.fcs P01_V04.fcs
-## P01_V05.fcs P01_V05.fcs
-## P01_V06.fcs P01_V06.fcs
-## P01_V07.fcs P01_V07.fcs
-## P02_V01.fcs P02_V01.fcs
-## P02_V02.fcs P02_V02.fcs
-## P02_V03.fcs P02_V03.fcs
-## P02_V04.fcs P02_V04.fcs
-## P02_V05.fcs P02_V05.fcs
-## P02_V06.fcs P02_V06.fcs
-## P02_V07.fcs P02_V07.fcs
-## P03_V01.fcs P03_V01.fcs
-## P03_V02.fcs P03_V02.fcs
-## P03_V03.fcs P03_V03.fcs
-## P03_V04.fcs P03_V04.fcs
-## P03_V05.fcs P03_V05.fcs
-## P03_V06.fcs P03_V06.fcs
-## P03_V07.fcs P03_V07.fcs
-## P04_V01.fcs P04_V01.fcs
-## P04_V02.fcs P04_V02.fcs
-## P04_V03.fcs P04_V03.fcs
-## P04_V04.fcs P04_V04.fcs
-## P04_V05.fcs P04_V05.fcs
-## P04_V06.fcs P04_V06.fcs
-## P04_V07.fcs P04_V07.fcs
-## P05_V01.fcs P05_V01.fcs
-## P05_V02.fcs P05_V02.fcs
-## P05_V03.fcs P05_V03.fcs
-## P05_V04.fcs P05_V04.fcs
-## P05_V05.fcs P05_V05.fcs
-## P05_V06.fcs P05_V06.fcs
-## P05_V07.fcs P05_V07.fcs</code></pre>
-<p>A quick sanity check: the number of rows in <code>pData(fs)</code>
-should equal the number of samples, every filename should match, and no
-metadata fields should be NA for samples that should have values.</p>
-<pre class="r"><code>stopifnot(nrow(pData(fs)) == length(sampleNames(fs)))
-stopifnot(all(rownames(pData(fs)) == sampleNames(fs)))
-summary(is.na(pData(fs)))</code></pre>
-<pre><code>##   filename       experiment_id   patient_id      treatment      
-##  Mode :logical   Mode :logical   Mode :logical   Mode :logical  
-##  FALSE:35        FALSE:35        FALSE:35        FALSE:35       
-##  gvhd_grade      timepoint_days  sample_source     panel           date        
-##  Mode :logical   Mode :logical   Mode :logical   Mode :logical   Mode:logical  
-##  FALSE:35        FALSE:35        FALSE:35        FALSE:35        TRUE:35       
-##   operator       instrument      panel_name      panel_version  
-##  Mode :logical   Mode :logical   Mode :logical   Mode :logical  
-##  FALSE:35        FALSE:35        FALSE:35        FALSE:35       
-##  unmixing_operator unmixing_date    notes            name        
-##  Mode:logical      Mode:logical   Mode :logical   Mode :logical  
-##  TRUE:35           TRUE:35        FALSE:35        FALSE:35</code></pre>
-<p>The metadata is now attached. The next script re-loads from the
-original FCS files and applies QC filtering — no intermediate save is
-needed since the source files are already in <code>data/unmixed/</code>
-and the metadata is already in <code>metadata/</code>.</p>
-<hr />
+## An object of class &#39;AnnotatedDataFrame&#39;
+##   rowNames: s5a01 s5a02 ... s10a07 (35 total)
+##   varLabels: Patient Visit ... name (5 total)
+##   varMetadata: labelDescription
+## 
+## column names(8): FSC-H SSC-H ... FL4-H Time</code></pre>
+<p>The column names in this dataset use dashes (e.g.,
+<code>FL1-H</code>). R works better with dots, so we normalize them with
+<code>make.names()</code>. This is exactly what
+<code>alter.names = TRUE</code> does when loading FCS files with
+<code>read.FCS()</code>.</p>
+<pre class="r"><code>colnames(GvHD) &lt;- make.names(colnames(GvHD))
+colnames(GvHD)</code></pre>
+<pre><code>## [1] &quot;FSC.H&quot; &quot;SSC.H&quot; &quot;FL1.H&quot; &quot;FL2.H&quot; &quot;FL3.H&quot; &quot;FL2.A&quot; &quot;FL4.H&quot; &quot;Time&quot;</code></pre>
 <blockquote>
-<p><strong>Navigation:</strong> <a href="../index.html">Home</a> | <a href="02_qc.html">Next: QC →</a></p>
+<p><strong>On your own data:</strong> You would load FCS files from disk
+instead:</p>
+<pre class="r"><code>fcs_dir &lt;- &quot;data/unmixed&quot;
+fcs_files &lt;- list.files(fcs_dir, pattern = &quot;\\.fcs$&quot;, full.names = TRUE)
+frames &lt;- lapply(fcs_files, read.FCS, transformation = FALSE, alter.names = TRUE)
+names(frames) &lt;- basename(fcs_files)
+fs &lt;- as(frames, &quot;flowSet&quot;)</code></pre>
+<p>Always use <code>transformation = FALSE</code> so R loads raw linear
+values rather than applying its own default transformation. You will
+apply the transformation yourself in script 03.</p>
+<p><strong>Spectral flow note:</strong> Unmixed FCS files from the Cytek
+Aurora will have one column per fluorochrome rather than one per
+detector. The number of columns depends on your panel size, not the
+number of Aurora detectors.</p>
 </blockquote>
+</div>
+<div id="inspecting-the-flowset" class="section level2">
+<h2>Inspecting the flowSet</h2>
+<pre class="r"><code>sampleNames(GvHD)</code></pre>
+<pre><code>##  [1] &quot;s5a01&quot;  &quot;s5a02&quot;  &quot;s5a03&quot;  &quot;s5a04&quot;  &quot;s5a05&quot;  &quot;s5a06&quot;  &quot;s5a07&quot;  &quot;s6a01&quot; 
+##  [9] &quot;s6a02&quot;  &quot;s6a03&quot;  &quot;s6a04&quot;  &quot;s6a05&quot;  &quot;s6a06&quot;  &quot;s6a07&quot;  &quot;s7a01&quot;  &quot;s7a02&quot; 
+## [17] &quot;s7a03&quot;  &quot;s7a04&quot;  &quot;s7a05&quot;  &quot;s7a06&quot;  &quot;s7a07&quot;  &quot;s9a01&quot;  &quot;s9a02&quot;  &quot;s9a03&quot; 
+## [25] &quot;s9a04&quot;  &quot;s9a05&quot;  &quot;s9a06&quot;  &quot;s9a07&quot;  &quot;s10a01&quot; &quot;s10a02&quot; &quot;s10a03&quot; &quot;s10a04&quot;
+## [33] &quot;s10a05&quot; &quot;s10a06&quot; &quot;s10a07&quot;</code></pre>
+<p>Each sample name encodes patient and visit: <code>s5a01</code> =
+patient 5, visit 1. Use <code>nrow()</code> on a flowFrame to see the
+event count for each sample.</p>
+<pre class="r"><code>fsApply(GvHD, nrow)</code></pre>
+<pre><code>##         [,1]
+## s5a01   3420
+## s5a02   3405
+## s5a03   3435
+## s5a04   8550
+## s5a05  10410
+## s5a06   3750
+## s5a07  13979
+## s6a01   2205
+## s6a02  13350
+## s6a03  11610
+## s6a04  13830
+## s6a05  13934
+## s6a06  19470
+## s6a07   9405
+## s7a01  16055
+## s7a02  10305
+## s7a03  30195
+## s7a04  59849
+## s7a05  39068
+## s7a06  11939
+## s7a07  13214
+## s9a01  12666
+## s9a02   8265
+## s9a03   4065
+## s9a04   7080
+## s9a05  66105
+## s9a06  49421
+## s9a07  12768
+## s10a01 17289
+## s10a02  4530
+## s10a03  6765
+## s10a04  9540
+## s10a05 25515
+## s10a06 24656
+## s10a07 25601</code></pre>
+</div>
+<div id="viewing-and-adding-sample-metadata" class="section level2">
+<h2>Viewing and adding sample metadata</h2>
+<p>Every <code>flowSet</code> carries per-sample metadata in a data
+frame accessible via <code>pData()</code>. The GvHD dataset already
+includes useful fields:</p>
+<pre class="r"><code>pData(GvHD)</code></pre>
+<pre><code>##        Patient Visit Days Grade   name
+## s5a01        5     1   -6     3  s5a01
+## s5a02        5     2    0     3  s5a02
+## s5a03        5     3    6     3  s5a03
+## s5a04        5     4   12     3  s5a04
+## s5a05        5     5   19     3  s5a05
+## s5a06        5     6   26     3  s5a06
+## s5a07        5     7   33     3  s5a07
+## s6a01        6     1   -8     3  s6a01
+## s6a02        6     2    0     3  s6a02
+## s6a03        6     3    5     3  s6a03
+## s6a04        6     4   12     3  s6a04
+## s6a05        6     5   19     3  s6a05
+## s6a06        6     6   27     3  s6a06
+## s6a07        6     7   32     3  s6a07
+## s7a01        7     1   -4     3  s7a01
+## s7a02        7     2    0     3  s7a02
+## s7a03        7     3    7     3  s7a03
+## s7a04        7     4   14     3  s7a04
+## s7a05        7     5   21     3  s7a05
+## s7a06        7     6   28     3  s7a06
+## s7a07        7     7   35     3  s7a07
+## s9a01        9     1   -6     3  s9a01
+## s9a02        9     2    0     3  s9a02
+## s9a03        9     3    6     3  s9a03
+## s9a04        9     4   11     3  s9a04
+## s9a05        9     5   18     3  s9a05
+## s9a06        9     6   25     3  s9a06
+## s9a07        9     7   32     3  s9a07
+## s10a01      10     1   -6     1 s10a01
+## s10a02      10     2    0     1 s10a02
+## s10a03      10     3    6     1 s10a03
+## s10a04      10     4   13     1 s10a04
+## s10a05      10     5   20     1 s10a05
+## s10a06      10     6   27     1 s10a06
+## s10a07      10     7   34     1 s10a07</code></pre>
+<table>
+<colgroup>
+<col width="47%" />
+<col width="52%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Patient</code></td>
+<td>Patient ID</td>
+</tr>
+<tr class="even">
+<td><code>Visit</code></td>
+<td>Visit number (1–7)</td>
+</tr>
+<tr class="odd">
+<td><code>Days</code></td>
+<td>Actual days post-transplant (negative = pre-transplant
+baseline)</td>
+</tr>
+<tr class="even">
+<td><code>Grade</code></td>
+<td>GvHD severity grade at this visit (1 = mild, 3 = severe)</td>
+</tr>
+</tbody>
+</table>
+<p>We add three columns that downstream scripts expect:</p>
+<pre class="r"><code>meta &lt;- pData(GvHD)
+meta$patient_id     &lt;- as.character(meta$Patient)
+meta$treatment      &lt;- ifelse(meta$Grade == 1, &quot;Grade 1 (mild)&quot;, &quot;Grade 3 (severe)&quot;)
+meta$timepoint_days &lt;- meta$Days
+pData(GvHD) &lt;- meta
+pData(GvHD)[, c(&quot;patient_id&quot;, &quot;treatment&quot;, &quot;timepoint_days&quot;)]</code></pre>
+<pre><code>##        patient_id        treatment timepoint_days
+## s5a01           5 Grade 3 (severe)             -6
+## s5a02           5 Grade 3 (severe)              0
+## s5a03           5 Grade 3 (severe)              6
+## s5a04           5 Grade 3 (severe)             12
+## s5a05           5 Grade 3 (severe)             19
+## s5a06           5 Grade 3 (severe)             26
+## s5a07           5 Grade 3 (severe)             33
+## s6a01           6 Grade 3 (severe)             -8
+## s6a02           6 Grade 3 (severe)              0
+## s6a03           6 Grade 3 (severe)              5
+## s6a04           6 Grade 3 (severe)             12
+## s6a05           6 Grade 3 (severe)             19
+## s6a06           6 Grade 3 (severe)             27
+## s6a07           6 Grade 3 (severe)             32
+## s7a01           7 Grade 3 (severe)             -4
+## s7a02           7 Grade 3 (severe)              0
+## s7a03           7 Grade 3 (severe)              7
+## s7a04           7 Grade 3 (severe)             14
+## s7a05           7 Grade 3 (severe)             21
+## s7a06           7 Grade 3 (severe)             28
+## s7a07           7 Grade 3 (severe)             35
+## s9a01           9 Grade 3 (severe)             -6
+## s9a02           9 Grade 3 (severe)              0
+## s9a03           9 Grade 3 (severe)              6
+## s9a04           9 Grade 3 (severe)             11
+## s9a05           9 Grade 3 (severe)             18
+## s9a06           9 Grade 3 (severe)             25
+## s9a07           9 Grade 3 (severe)             32
+## s10a01         10   Grade 1 (mild)             -6
+## s10a02         10   Grade 1 (mild)              0
+## s10a03         10   Grade 1 (mild)              6
+## s10a04         10   Grade 1 (mild)             13
+## s10a05         10   Grade 1 (mild)             20
+## s10a06         10   Grade 1 (mild)             27
+## s10a07         10   Grade 1 (mild)             34</code></pre>
+<p><code>treatment</code> is derived from GvHD severity grade — a real
+biological variable. Patients 5, 6, 7, and 9 have Grade 3 (severe GvHD);
+patient 10 has Grade 1 (mild). With only five patients this is a small
+dataset, but it is large enough to demonstrate the full pipeline.</p>
+<blockquote>
+<p><strong>On your own data:</strong> Your metadata would come from CSV
+files rather than a built-in dataset:</p>
+<pre class="r"><code>sample_meta     &lt;- read_csv(&quot;metadata/sample_metadata.csv&quot;)
+experiment_meta &lt;- read_csv(&quot;metadata/experiment_metadata.csv&quot;)
+meta &lt;- left_join(sample_meta, experiment_meta, by = &quot;experiment_id&quot;) |&gt; as.data.frame()
+meta_ordered &lt;- meta[match(sampleNames(fs), meta$filename), ]
+rownames(meta_ordered) &lt;- meta_ordered$filename
+pData(fs) &lt;- meta_ordered</code></pre>
+<p>Always reorder metadata rows to match <code>sampleNames(fs)</code>
+exactly before assigning — <code>pData()</code> does not reorder
+automatically.</p>
+</blockquote>
+<p>The next script runs QC on this data. No save is needed here — GvHD
+is small enough that each script reloads it directly.</p>
+<hr>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
+<p><a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="00_data_structures.html" class="btn btn-default btn-sm">← Prev:
+Data Structures</a>
+<a href="02_qc.html" class="btn btn-primary btn-sm">Next: QC →</a></p>
+</div>
+</div>
 
 
 

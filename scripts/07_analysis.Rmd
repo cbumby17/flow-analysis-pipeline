@@ -7,7 +7,10 @@ output:
     toc_float: true
 ---
 
-> **Navigation:** [Home](../index.html) | [← Prev: Clustering](06_clustering.html)
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="06_clustering.html" class="btn btn-default btn-sm">← Prev: Clustering</a>
+</div>
 
 ---
 
@@ -134,6 +137,8 @@ write_csv(freq_df, "output/tables/GvHD_tcell_frequencies.csv")
 write_csv(mfi_df,  "output/tables/GvHD_tcell_mfi.csv")
 ```
 
----
-
-> **Navigation:** [Home](../index.html) | [← Prev: Clustering](06_clustering.html)
+<hr>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="06_clustering.html" class="btn btn-default btn-sm">← Prev: Clustering</a>
+</div>

@@ -30,7 +30,7 @@ The example data used throughout is the GvHD dataset from the `flowCore` package
 
 ## Setup
 
-Clone the repo, install the required packages, then run the data setup script once:
+Install the required packages. The example data (`GvHD`) is built into the `flowCore` package and loads with a single line in script 01 — no files to download.
 
 ```r
 # CRAN
@@ -39,12 +39,9 @@ install.packages(c("tidyverse", "uwot", "lme4", "emmeans", "gridExtra"))
 # Bioconductor
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "PeacoQC", "FlowSOM"))
-
-# Generate the example data
-source("data/get_example_data.R")
 ```
 
-Then work through the scripts in order, starting with [00: Data Structures](scripts/00_data_structures.html).
+Then work through the scripts in order, starting with [00: Data Structures](scripts/00_data_structures.html). Script 01 will walk you through setting up a working directory before any files are saved.
 
 ---
 

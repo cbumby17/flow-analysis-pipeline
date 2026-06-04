@@ -1,3 +1,16 @@
+---
+title: "00: Data Structures"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="01_load_and_metadata.html" class="btn btn-primary btn-sm">Next: Load Data →</a>
+</div>
 
 ```{r load_libraries}
 library(flowCore)
@@ -86,7 +99,7 @@ fs
 sampleNames(fs)
 ```
 
-Note that the original list is unnamed and that the resulting sample names are not particularly meaningful. If the list is named, the list constructed is much more meaningful. One such approach is to employ the `keyword` method for `flowFrame` objects to extract the `“SAMPLE ID”` keyword from each frame:
+Note that the original list is unnamed and that the resulting sample names are not particularly meaningful. If the list is named, the list constructed is much more meaningful. One such approach is to employ the `keyword` method for `flowFrame` objects to extract the `"SAMPLE ID"` keyword from each frame:
 
 ```{r}
 names(frames) <- sapply(frames, keyword, "SAMPLE ID")
@@ -95,3 +108,9 @@ fs
 
 sampleNames(fs)
 ```
+
+<hr>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="01_load_and_metadata.html" class="btn btn-primary btn-sm">Next: Load Data →</a>
+</div>

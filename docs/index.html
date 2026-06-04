@@ -1565,18 +1565,18 @@ Dimensionality Reduction</a></td>
 </div>
 <div id="setup" class="section level2">
 <h2>Setup</h2>
-<p>Clone the repo, install the required packages, then run the data
-setup script once:</p>
+<p>Install the required packages. The example data (<code>GvHD</code>)
+is built into the <code>flowCore</code> package and loads with a single
+line in script 01 — no files to download.</p>
 <pre class="r"><code># CRAN
 install.packages(c(&quot;tidyverse&quot;, &quot;uwot&quot;, &quot;lme4&quot;, &quot;emmeans&quot;, &quot;gridExtra&quot;))
 
 # Bioconductor
 if (!requireNamespace(&quot;BiocManager&quot;, quietly = TRUE)) install.packages(&quot;BiocManager&quot;)
-BiocManager::install(c(&quot;flowCore&quot;, &quot;flowWorkspace&quot;, &quot;openCyto&quot;, &quot;ggcyto&quot;, &quot;PeacoQC&quot;, &quot;FlowSOM&quot;))
-
-# Generate the example data
-source(&quot;data/get_example_data.R&quot;)</code></pre>
-<p>Then work through the scripts in order, starting with <a href="scripts/00_data_structures.html">00: Data Structures</a>.</p>
+BiocManager::install(c(&quot;flowCore&quot;, &quot;flowWorkspace&quot;, &quot;openCyto&quot;, &quot;ggcyto&quot;, &quot;PeacoQC&quot;, &quot;FlowSOM&quot;))</code></pre>
+<p>Then work through the scripts in order, starting with <a href="scripts/00_data_structures.html">00: Data Structures</a>. Script
+01 will walk you through setting up a working directory before any files
+are saved.</p>
 <hr />
 </div>
 <div id="why-r-and-not-flowjo" class="section level2">

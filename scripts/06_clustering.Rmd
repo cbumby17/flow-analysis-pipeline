@@ -7,7 +7,11 @@ output:
     toc_float: true
 ---
 
-> **Navigation:** [Home](../index.html) | [← Prev: Dimensionality Reduction](05_dimensionality_reduction.html) | [Next: Analysis →](07_analysis.html)
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="05_dimensionality_reduction.html" class="btn btn-default btn-sm">← Prev: Dimensionality Reduction</a>
+<a href="07_analysis.html" class="btn btn-primary btn-sm">Next: Analysis →</a>
+</div>
 
 ---
 
@@ -103,6 +107,9 @@ expr_df$population <- cluster_labels[as.character(expr_df$cluster)]
 saveRDS(expr_df, "data/processed/GvHD_tcell_clustered.rds")
 ```
 
----
-
-> **Navigation:** [Home](../index.html) | [← Prev: Dimensionality Reduction](05_dimensionality_reduction.html) | [Next: Analysis →](07_analysis.html)
+<hr>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="05_dimensionality_reduction.html" class="btn btn-default btn-sm">← Prev: Dimensionality Reduction</a>
+<a href="07_analysis.html" class="btn btn-primary btn-sm">Next: Analysis →</a>
+</div>

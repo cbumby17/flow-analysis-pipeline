@@ -7,7 +7,11 @@ output:
     toc_float: true
 ---
 
-> **Navigation:** [Home](../index.html) | [Next: QC →](02_qc.html)
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="00_data_structures.html" class="btn btn-default btn-sm">← Prev: Data Structures</a>
+<a href="02_qc.html" class="btn btn-primary btn-sm">Next: QC →</a>
+</div>
 
 ---
 
@@ -16,48 +20,105 @@ library(flowCore)
 library(tidyverse)
 ```
 
-We start by reading the unmixed FCS files from `data/unmixed/`. We name each frame by its filename immediately so that when we build the flowSet, `sampleNames()` returns something meaningful rather than the default numeric index. This naming matters because we'll use the filename as the join key when we attach metadata.
+## Setting up a working directory
 
-```{r load_fcs}
-fcs_dir <- "data/unmixed"
-fcs_files <- list.files(fcs_dir, pattern = "\\.fcs$", full.names = TRUE)
+Before running anything, set a consistent working directory. Scripts 02 onwards save processed files, and each script must be able to find files created by the previous one. Pick a folder and use it throughout the tutorial.
 
-frames <- lapply(fcs_files, read.FCS, transformation = FALSE, alter.names = TRUE)
-names(frames) <- basename(fcs_files)
-
-fs <- as(frames, "flowSet")
-fs
+```r
+# Create a folder for this tutorial and set it as your working directory.
+# You can change this path to wherever you like.
+dir.create("~/flow_tutorial", showWarnings = FALSE)
+setwd("~/flow_tutorial")
 ```
 
-Load the two metadata files separately, then join them on `experiment_id`. Keeping them separate until this point makes it easier to validate each one before merging.
-
-```{r load_metadata, message=FALSE}
-sample_meta <- read_csv("metadata/sample_metadata.csv")
-experiment_meta <- read_csv("metadata/experiment_metadata.csv")
-
-meta <- left_join(sample_meta, experiment_meta, by = "experiment_id") |> as.data.frame()
-```
-
-Before attaching metadata to the flowSet, reorder its rows to match `sampleNames(fs)` exactly. `pData()` expects a one-to-one correspondence and does not reorder automatically.
-
-```{r attach_metadata}
-meta_ordered <- meta[match(sampleNames(fs), meta$filename), ]
-rownames(meta_ordered) <- meta_ordered$filename
-
-pData(fs) <- meta_ordered
-pData(fs)
-```
-
-A quick sanity check: the number of rows in `pData(fs)` should equal the number of samples, every filename should match, and no metadata fields should be NA for samples that should have values.
-
-```{r sanity_check}
-stopifnot(nrow(pData(fs)) == length(sampleNames(fs)))
-stopifnot(all(rownames(pData(fs)) == sampleNames(fs)))
-summary(is.na(pData(fs)))
-```
-
-The metadata is now attached. The next script re-loads from the original FCS files and applies QC filtering — no intermediate save is needed since the source files are already in `data/unmixed/` and the metadata is already in `metadata/`.
+You only need to create the folder once. Each time you restart R, run `setwd("~/flow_tutorial")` before continuing.
 
 ---
 
-> **Navigation:** [Home](../index.html) | [Next: QC →](02_qc.html)
+## Loading the example data
+
+This tutorial uses the `GvHD` dataset built into the `flowCore` package — a longitudinal study of bone marrow transplant patients. Five patients were each measured at seven visits, giving 35 samples total. The panel is a conventional 4-color FITC/PE/PerCP/APC setup run on a FACScan. Differences from Cytek Aurora spectral data are noted throughout.
+
+```{r load_gvhd}
+data(GvHD)
+GvHD
+```
+
+The column names in this dataset use dashes (e.g., `FL1-H`). R works better with dots, so we normalize them with `make.names()`. This is exactly what `alter.names = TRUE` does when loading FCS files with `read.FCS()`.
+
+```{r normalize_colnames}
+colnames(GvHD) <- make.names(colnames(GvHD))
+colnames(GvHD)
+```
+
+> **On your own data:** You would load FCS files from disk instead:
+> ```r
+> fcs_dir <- "data/unmixed"
+> fcs_files <- list.files(fcs_dir, pattern = "\\.fcs$", full.names = TRUE)
+> frames <- lapply(fcs_files, read.FCS, transformation = FALSE, alter.names = TRUE)
+> names(frames) <- basename(fcs_files)
+> fs <- as(frames, "flowSet")
+> ```
+> Always use `transformation = FALSE` so R loads raw linear values rather than applying its own default transformation. You will apply the transformation yourself in script 03.
+>
+> **Spectral flow note:** Unmixed FCS files from the Cytek Aurora will have one column per fluorochrome rather than one per detector. The number of columns depends on your panel size, not the number of Aurora detectors.
+
+## Inspecting the flowSet
+
+```{r inspect}
+sampleNames(GvHD)
+```
+
+Each sample name encodes patient and visit: `s5a01` = patient 5, visit 1. Use `nrow()` on a flowFrame to see the event count for each sample.
+
+```{r event_counts}
+fsApply(GvHD, nrow)
+```
+
+## Viewing and adding sample metadata
+
+Every `flowSet` carries per-sample metadata in a data frame accessible via `pData()`. The GvHD dataset already includes useful fields:
+
+```{r pdata}
+pData(GvHD)
+```
+
+| Column | Meaning |
+|--------|---------|
+| `Patient` | Patient ID |
+| `Visit` | Visit number (1–7) |
+| `Days` | Actual days post-transplant (negative = pre-transplant baseline) |
+| `Grade` | GvHD severity grade at this visit (1 = mild, 3 = severe) |
+
+We add three columns that downstream scripts expect:
+
+```{r add_metadata}
+meta <- pData(GvHD)
+meta$patient_id     <- as.character(meta$Patient)
+meta$treatment      <- ifelse(meta$Grade == 1, "Grade 1 (mild)", "Grade 3 (severe)")
+meta$timepoint_days <- meta$Days
+pData(GvHD) <- meta
+pData(GvHD)[, c("patient_id", "treatment", "timepoint_days")]
+```
+
+`treatment` is derived from GvHD severity grade — a real biological variable. Patients 5, 6, 7, and 9 have Grade 3 (severe GvHD); patient 10 has Grade 1 (mild). With only five patients this is a small dataset, but it is large enough to demonstrate the full pipeline.
+
+> **On your own data:** Your metadata would come from CSV files rather than a built-in dataset:
+> ```r
+> sample_meta     <- read_csv("metadata/sample_metadata.csv")
+> experiment_meta <- read_csv("metadata/experiment_metadata.csv")
+> meta <- left_join(sample_meta, experiment_meta, by = "experiment_id") |> as.data.frame()
+> meta_ordered <- meta[match(sampleNames(fs), meta$filename), ]
+> rownames(meta_ordered) <- meta_ordered$filename
+> pData(fs) <- meta_ordered
+> ```
+> Always reorder metadata rows to match `sampleNames(fs)` exactly before assigning — `pData()` does not reorder automatically.
+
+The next script runs QC on this data. No save is needed here — GvHD is small enough that each script reloads it directly.
+
+<hr>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="00_data_structures.html" class="btn btn-default btn-sm">← Prev: Data Structures</a>
+<a href="02_qc.html" class="btn btn-primary btn-sm">Next: QC →</a>
+</div>

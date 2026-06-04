@@ -7,7 +7,11 @@ output:
     toc_float: true
 ---
 
-> **Navigation:** [Home](../index.html) | [← Prev: QC](02_qc.html) | [Next: Gating →](04_gating.html)
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="02_qc.html" class="btn btn-default btn-sm">← Prev: QC</a>
+<a href="04_gating.html" class="btn btn-primary btn-sm">Next: Gating →</a>
+</div>
 
 ---
 
@@ -24,12 +28,8 @@ frames <- lapply(qc_files, read.FCS, transformation = FALSE, alter.names = TRUE)
 names(frames) <- basename(qc_files)
 fs <- as(frames, "flowSet")
 
-sample_meta <- read_csv("metadata/sample_metadata.csv", show_col_types = FALSE)
-experiment_meta <- read_csv("metadata/experiment_metadata.csv", show_col_types = FALSE)
-meta <- left_join(sample_meta, experiment_meta, by = "experiment_id") |> as.data.frame()
-meta_ordered <- meta[match(sampleNames(fs), meta$filename), ]
-rownames(meta_ordered) <- meta_ordered$filename
-pData(fs) <- meta_ordered
+meta <- read.csv("data/processed/qc/GvHD_metadata.csv", row.names = 1)
+pData(fs) <- meta[sampleNames(fs), ]
 ```
 
 Before applying any transformation, check the `$PnE` keyword to confirm how the data is stored. `$PnE = "0,0"` means untransformed linear — you apply arcsinh yourself. Anything else means a transformation was already applied at acquisition or export.
@@ -73,6 +73,9 @@ cat("GatingSet saved to data/processed/GvHD_tcell_gs_base\n")
 > fs_transformed <- transform(fs, transList)
 > ```
 
----
-
-> **Navigation:** [Home](../index.html) | [← Prev: QC](02_qc.html) | [Next: Gating →](04_gating.html)
+<hr>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="02_qc.html" class="btn btn-default btn-sm">← Prev: QC</a>
+<a href="04_gating.html" class="btn btn-primary btn-sm">Next: Gating →</a>
+</div>

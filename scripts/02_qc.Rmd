@@ -7,7 +7,11 @@ output:
     toc_float: true
 ---
 
-> **Navigation:** [Home](../index.html) | [← Prev: Load Data](01_load_and_metadata.html) | [Next: Transformation →](03_transformation.html)
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="01_load_and_metadata.html" class="btn btn-default btn-sm">← Prev: Load Data</a>
+<a href="03_transformation.html" class="btn btn-primary btn-sm">Next: Transformation →</a>
+</div>
 
 ---
 
@@ -18,17 +22,14 @@ library(tidyverse)
 ```
 
 ```{r load, message=FALSE}
-fcs_files <- list.files("data/unmixed", pattern = "fcs$", full.names = TRUE)
-frames    <- lapply(fcs_files, read.FCS, transformation = FALSE, alter.names = TRUE)
-names(frames) <- basename(fcs_files)
-fs <- as(frames, "flowSet")
-
-sample_meta     <- read_csv("metadata/sample_metadata.csv", show_col_types = FALSE)
-experiment_meta <- read_csv("metadata/experiment_metadata.csv", show_col_types = FALSE)
-meta <- left_join(sample_meta, experiment_meta, by = "experiment_id") |> as.data.frame()
-meta_ordered <- meta[match(sampleNames(fs), meta$filename), ]
-rownames(meta_ordered) <- meta_ordered$filename
-pData(fs) <- meta_ordered
+data(GvHD)
+colnames(GvHD) <- make.names(colnames(GvHD))
+meta <- pData(GvHD)
+meta$patient_id     <- as.character(meta$Patient)
+meta$treatment      <- ifelse(meta$Grade == 1, "Grade 1 (mild)", "Grade 3 (severe)")
+meta$timepoint_days <- meta$Days
+pData(GvHD) <- meta
+fs <- GvHD
 ```
 
 Before transforming or gating anything, we check for acquisition problems. The two main things to look for are signal instability over time (caused by clogging or fluidics issues mid-run) and margin events (events where the signal hit the detector ceiling and the true value is unknown).
@@ -55,6 +56,8 @@ ggplot(time_df, aes(x = Time, y = FL1.H)) +
 ```
 
 PeacoQC automates this detection. It identifies and removes anomalous events based on signal consistency over time. We run it on each sample and collect the cleaned frames.
+
+> **Spectral flow note:** On Aurora data, run PeacoQC on a representative subset of unmixed channels rather than all of them. A channel with very few positive cells can produce noisy signal that PeacoQC flags as instability when it isn't. Choose channels that have enough positive events across most samples.
 
 ```{r peaco_qc, message=FALSE, warning=FALSE, results='hide'}
 dir.create("output/qc", recursive = TRUE, showWarnings = FALSE)
@@ -112,16 +115,25 @@ data.frame(
 )
 ```
 
-We save each QC-passed frame as an individual FCS file. The `flowSet` class uses reference-based storage that doesn't serialize cleanly with `saveRDS`, so saving individual frames with `write.FCS()` is the correct approach at this stage.
+We save each QC-passed frame as an individual FCS file. The `flowSet` class uses reference-based storage that doesn't serialize cleanly with `saveRDS`, so saving individual frames with `write.FCS()` is the correct approach at this stage. We also save the metadata as a CSV so the next script can reattach it.
 
 ```{r save}
 dir.create("data/processed/qc", recursive = TRUE, showWarnings = FALSE)
+
 fsApply(fs_clean, function(ff) {
-  write.FCS(ff, file.path("data/processed/qc", identifier(ff)))
+  write.FCS(ff, file.path("data/processed/qc", paste0(identifier(ff), ".fcs")))
 })
-cat("Saved", length(fs_clean), "QC-filtered FCS files to data/processed/qc/\n")
+
+meta_out <- pData(fs)
+rownames(meta_out) <- paste0(rownames(meta_out), ".fcs")
+write.csv(meta_out, "data/processed/qc/GvHD_metadata.csv")
+
+cat("Saved", length(fs_clean), "QC-filtered FCS files and metadata to data/processed/qc/\n")
 ```
 
----
-
-> **Navigation:** [Home](../index.html) | [← Prev: Load Data](01_load_and_metadata.html) | [Next: Transformation →](03_transformation.html)
+<hr>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
+<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
+<a href="01_load_and_metadata.html" class="btn btn-default btn-sm">← Prev: Load Data</a>
+<a href="03_transformation.html" class="btn btn-primary btn-sm">Next: Transformation →</a>
+</div>
