@@ -1,6 +1,6 @@
 # Flow Cytometry Analysis in R
 
-A step-by-step tutorial for analyzing flow cytometry data in R, built around the Cytek Aurora spectral flow cytometer. The pipeline covers everything from loading FCS files through statistical analysis, with an emphasis on reproducibility.
+A reproducible flow cytometry analysis pipeline in R, covering QC, transformation, gating, dimensionality reduction, and statistical analysis. Specific considerations for spectral flow are noted throughout.
 
 **[→ Open the tutorial](https://cbumby17.github.io/flow-analysis-pipeline/)**
 
@@ -26,6 +26,18 @@ install.packages(c("tidyverse", "uwot", "lme4", "emmeans", "gridExtra"))
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "PeacoQC", "FlowSOM"))
 ```
+
+## FCS file naming
+
+Name your FCS files using underscores as separators and no spaces. A consistent naming scheme makes files easier to sort, load programmatically, and understand at a glance. A useful convention:
+
+```
+YYYYMMDD_mouseID_sex_treatment_timepoint_sampleSource_panel.fcs
+```
+
+For example: `20240603_M01_F_Salmonella_D7_SPL_CD8tet.fcs`
+
+The key rules: no spaces (use underscores), no special characters, be consistent with abbreviations throughout a project, and define any abbreviations you use in your experiment metadata before data collection begins.
 
 ## Project structure
 
