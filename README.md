@@ -4,16 +4,6 @@ A step-by-step tutorial for analyzing flow cytometry data in R, built around the
 
 **[→ Open the tutorial](https://cbumby17.github.io/flow-analysis-pipeline/)**
 
-## What this covers
-
-1. Loading FCS files and attaching experimental metadata
-2. Quality control — temporal instability, margin events
-3. Transformation — checking `$PnE`, applying arcsinh
-4. Gating — sequential manual gates (scatter, singlets, live/dead, population of interest)
-5. Dimensionality reduction — UMAP
-6. Unsupervised clustering — FlowSOM (optional)
-7. Statistical analysis — cell frequencies, MFI, mixed models
-
 ## Why R and not FlowJo?
 
 FlowJo is the standard in most flow labs and it's good at what it does — fast, visual, and familiar. But it has a reproducibility problem. When you gate in FlowJo, the decisions you make (where you drew the gate, what you excluded, how you defined a population) live in a workspace file that isn't human-readable and doesn't travel well. If someone asks how you got your numbers, the honest answer is often "open my workspace and look." You can't easily version-control it, diff it, or hand it to a collaborator who has a different FlowJo version.
@@ -30,43 +20,12 @@ R ≥ 4.1. Install the required packages:
 
 ```r
 # CRAN
-install.packages(c("tidyverse", "uwot", "lme4", "emmeans"))
+install.packages(c("tidyverse", "uwot", "lme4", "emmeans", "gridExtra"))
 
 # Bioconductor
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-BiocManager::install(c(
-  "flowCore",
-  "flowWorkspace",
-  "openCyto",
-  "ggcyto",
-  "PeacoQC",
-  "FlowSOM"
-))
+BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "PeacoQC", "FlowSOM"))
 ```
-
-## Getting started
-
-The easiest way to follow along is through the [tutorial site](https://cbumby17.github.io/flow-analysis-pipeline/) — install the packages, then copy and paste code from each script page into your R console.
-
-To render scripts locally, clone the repo and run:
-
-```r
-rmarkdown::render("scripts/01_load_and_metadata.Rmd")
-```
-
-Or render the full site at once:
-
-```r
-source("render_site.R")
-```
-
-## About the example data
-
-The tutorial uses the GvHD dataset from the `flowCore` package (Srivastava et al.) — a longitudinal flow cytometry study of bone marrow transplant patients monitored for graft-versus-host disease. It is conventional flow cytometry data from a FACScan instrument, not Cytek Aurora spectral flow.
-
-The key difference from Aurora data: fluorescence channels in this dataset are log-amplified (`$PnE = "4,0"`, not `"0,0"`), so the standard arcsinh transformation step is skipped for this data. Script 03 explains how to detect and handle both cases. All other pipeline steps apply equally.
-
-To use this pipeline with your own Cytek Aurora data, place your unmixed FCS files in `data/unmixed/` and fill in `metadata/sample_metadata.csv` and `metadata/experiment_metadata.csv` following the format documented in `CLAUDE.md`.
 
 ## Project structure
 
