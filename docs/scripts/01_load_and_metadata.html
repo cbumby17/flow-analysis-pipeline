@@ -1505,8 +1505,6 @@ border-radius: 0px;
 <a href="02_qc.html" class="btn btn-primary btn-sm">Next: QC →</a></p>
 </div>
 <hr />
-<pre class="r"><code>library(flowCore)
-library(tidyverse)</code></pre>
 <div id="project-structure-and-file-naming" class="section level2">
 <h2>Project structure and file naming</h2>
 <div id="directory-structure" class="section level3">
@@ -1559,19 +1557,6 @@ setwd(&quot;~/flow_tutorial&quot;)</code></pre>
 <hr />
 </div>
 </div>
-<div id="data-structures" class="section level2">
-<h2>Data structures</h2>
-<p>All flow cytometry data in R lives in two objects from the
-<code>flowCore</code> package:</p>
-<p><strong><code>flowFrame</code></strong> — a single FCS file. Contains
-a matrix of expression values (one row per cell event and one column per
-measured parameter), parameter metadata, and FCS file keywords. Access
-the expression data directly with <code>exprs()</code>.</p>
-<p><strong><code>flowSet</code></strong> — a collection of
-<code>flowFrame</code>s from one experiment. Lets you apply operations
-across all samples at once via <code>fsApply()</code>. Most of your work
-in this tutorial happens at the <code>flowSet</code> level.</p>
-</div>
 <div id="stages-of-flow-data" class="section level2">
 <h2>Stages of flow data</h2>
 <p>Before loading anything, it is important to understand where in the
@@ -1598,12 +1583,29 @@ working with the consequences of those upstream decisions.</p>
 </div>
 <div id="loading-the-example-data" class="section level2">
 <h2>Loading the example data</h2>
+<pre class="r"><code>library(flowCore)
+library(tidyverse)</code></pre>
 <p>This tutorial uses the <code>GvHD</code> dataset built into the
-<code>flowCore</code> package — a longitudinal study of bone marrow
-transplant patients. Five patients were each measured at seven visits,
-giving 35 samples total. The panel is a conventional 4-color
-FITC/PE/PerCP/APC setup run on a FACScan. Differences from Cytek Aurora
-spectral data are noted throughout.</p>
+<code>flowCore</code> package which is a longitudinal study of bone
+marrow transplant patients. Five patients were each measured at seven
+visits, giving 35 samples total. The panel is a conventional 4-color
+FITC/PE/PerCP/APC setup run on a FACScan. Differences from spectral data
+are noted throughout.</p>
+</div>
+<div id="data-structures" class="section level2">
+<h2>Data structures</h2>
+<p>All flow cytometry data in R lives in two objects from the
+<code>flowCore</code> package:</p>
+<p><strong><code>flowFrame</code></strong> — a single FCS file. Contains
+a matrix of expression values (one row per event and one column per
+measured parameter), parameter metadata, and FCS file keywords. Access
+the expression data directly with <code>exprs()</code>.</p>
+<p><strong><code>flowSet</code></strong> — a collection of
+<code>flowFrame</code>s from one experiment. Lets you apply operations
+across all samples at once via <code>fsApply()</code>. Most of your work
+in this tutorial happens at the <code>flowSet</code> level.</p>
+<p>Use the code below to load your data and explore the
+<code>flowSet</code>:</p>
 <pre class="r"><code>data(GvHD)
 GvHD</code></pre>
 <pre><code>## A flowSet with 35 experiments.
@@ -1633,10 +1635,9 @@ fs &lt;- as(frames, &quot;flowSet&quot;)</code></pre>
 <p>Always use <code>transformation = FALSE</code> so R loads raw linear
 values rather than applying its own default transformation. You will
 apply the transformation yourself in script 03.</p>
-<p><strong>Spectral flow note:</strong> Unmixed FCS files from the Cytek
-Aurora will have one column per fluorochrome rather than one per
-detector. The number of columns depends on your panel size, not the
-number of Aurora detectors.</p>
+<p><strong>Spectral flow note:</strong> Unmixed FCS files will have one
+column per fluorochrome rather than one per detector. The number of
+columns depends on your panel size, not the number of detectors.</p>
 </blockquote>
 </div>
 <div id="inspecting-the-flowset" class="section level2">
@@ -1763,8 +1764,8 @@ baseline)</td>
 </table>
 <p>We add three columns that downstream scripts expect:</p>
 <pre class="r"><code>meta &lt;- pData(GvHD)
-meta$patient_id     &lt;- as.character(meta$Patient)
-meta$treatment      &lt;- ifelse(meta$Grade == 1, &quot;Grade 1 (mild)&quot;, &quot;Grade 3 (severe)&quot;)
+meta$patient_id &lt;- as.character(meta$Patient)
+meta$treatment &lt;- ifelse(meta$Grade == 1, &quot;Grade 1 (mild)&quot;, &quot;Grade 3 (severe)&quot;)
 meta$timepoint_days &lt;- meta$Days
 pData(GvHD) &lt;- meta
 pData(GvHD)[, c(&quot;patient_id&quot;, &quot;treatment&quot;, &quot;timepoint_days&quot;)]</code></pre>
@@ -1804,14 +1805,14 @@ pData(GvHD)[, c(&quot;patient_id&quot;, &quot;treatment&quot;, &quot;timepoint_d
 ## s10a05         10   Grade 1 (mild)             20
 ## s10a06         10   Grade 1 (mild)             27
 ## s10a07         10   Grade 1 (mild)             34</code></pre>
-<p><code>treatment</code> is derived from GvHD severity grade — a real
+<p><code>treatment</code> is derived from GvHD severity grade, a real
 biological variable. Patients 5, 6, 7, and 9 have Grade 3 (severe GvHD);
 patient 10 has Grade 1 (mild). With only five patients this is a small
 dataset, but it is large enough to demonstrate the full pipeline.</p>
 <blockquote>
 <p><strong>On your own data:</strong> Your metadata would come from CSV
 files rather than a built-in dataset:</p>
-<pre class="r"><code>sample_meta     &lt;- read_csv(&quot;metadata/sample_metadata.csv&quot;)
+<pre class="r"><code>sample_meta &lt;- read_csv(&quot;metadata/sample_metadata.csv&quot;)
 experiment_meta &lt;- read_csv(&quot;metadata/experiment_metadata.csv&quot;)
 meta &lt;- left_join(sample_meta, experiment_meta, by = &quot;experiment_id&quot;) |&gt; as.data.frame()
 meta_ordered &lt;- meta[match(sampleNames(fs), meta$filename), ]

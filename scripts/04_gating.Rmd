@@ -41,14 +41,14 @@ Gating is sequential — each gate is applied within the parent population from 
 
 Start with the scatter gate to isolate lymphocytes from debris. Visualize first to understand the data before setting values.
 
-```{r scatter_vis, fig.width=14, fig.height=8, warning=FALSE}
+```{r scatter_vis, fig.width=12, fig.height=16, warning=FALSE}
 df_all <- get_pop_df(gs, "root")
 
 ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c() +
-  facet_wrap(~sample, ncol = 7) +
-  theme_minimal(base_size = 8) +
+  facet_wrap(~sample, ncol = 5) +
+  theme_minimal(base_size = 10) +
   labs(title = "All events — identify lymphocyte cluster before setting gate")
 ```
 
@@ -63,27 +63,27 @@ gs_pop_add(gs, scatter_gate, parent = "root")
 recompute(gs)
 ```
 
-```{r scatter_check, fig.width=14, fig.height=8, warning=FALSE}
+```{r scatter_check, fig.width=12, fig.height=16, warning=FALSE}
 ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c() +
   geom_rect(aes(xmin = 100, xmax = 850, ymin = 0, ymax = 500),
             fill = NA, color = "red", linewidth = 0.8, inherit.aes = FALSE) +
-  facet_wrap(~sample, ncol = 7) +
-  theme_minimal(base_size = 8) +
+  facet_wrap(~sample, ncol = 5) +
+  theme_minimal(base_size = 10) +
   labs(title = "Lymphocyte gate (red box)")
 ```
 
 For singlet discrimination, modern instruments use FSC-Height vs FSC-Area: single cells fall on a tight diagonal, doublets appear above it. This dataset doesn't have FSC-Area, so we use FL2.H vs FL2.A — the PE channel height and area — which captures the same doublet-exclusion principle. On your Aurora data, use `FSC.A` vs `FSC.H` instead.
 
-```{r singlet_vis, fig.width=14, fig.height=8, warning=FALSE}
+```{r singlet_vis, fig.width=12, fig.height=16, warning=FALSE}
 df_lymph <- get_pop_df(gs, "lymphocytes")
 
 ggplot(df_lymph, aes(x = FL2.A, y = FL2.H)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c() +
-  facet_wrap(~sample, ncol = 7) +
-  theme_minimal(base_size = 8) +
+  facet_wrap(~sample, ncol = 5) +
+  theme_minimal(base_size = 10) +
   labs(title = "FL2.A vs FL2.H — singlet population falls along the diagonal")
 ```
 
@@ -109,14 +109,14 @@ The GvHD panel doesn't include a viability dye. In a real experiment you would g
 
 Now gate on your population of interest. Here we gate on FL1.H-high cells (the FITC channel).
 
-```{r population_vis, fig.width=14, fig.height=8, warning=FALSE}
+```{r population_vis, fig.width=12, fig.height=16, warning=FALSE}
 df_sing <- get_pop_df(gs, "singlets")
 
 ggplot(df_sing, aes(x = FL1.H, y = FL4.H)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c() +
-  facet_wrap(~sample, ncol = 7) +
-  theme_minimal(base_size = 8) +
+  facet_wrap(~sample, ncol = 5) +
+  theme_minimal(base_size = 10) +
   labs(title = "FL1.H vs FL4.H — gate on your population of interest")
 ```
 

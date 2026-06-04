@@ -36,7 +36,7 @@ Before transforming or gating anything, we check for acquisition problems. The t
 
 Plotting signal against time is the fastest way to spot a run that went wrong. A healthy acquisition looks flat. A sudden spike, gradual drift, or a section of flat line followed by a jump usually means something happened to the flow rate.
 
-```{r time_plots, fig.width=14, fig.height=8, warning=FALSE, message=FALSE}
+```{r time_plots, fig.width=12, fig.height=16, warning=FALSE, message=FALSE}
 time_data <- fsApply(fs, function(ff) {
   data.frame(
     Time  = exprs(ff)[, "Time"],
@@ -48,11 +48,11 @@ time_df <- do.call(rbind, time_data)
 
 ggplot(time_df, aes(x = Time, y = FL1.H)) +
   geom_hex(bins = 40) +
-  facet_wrap(~sample, ncol = 7) +
+  facet_wrap(~sample, ncol = 5) +
   scale_fill_viridis_c() +
   labs(title = "Signal stability over time — FL1.H channel",
        x = "Time", y = "FL1.H") +
-  theme_minimal(base_size = 8)
+  theme_minimal(base_size = 10)
 ```
 
 PeacoQC automates this detection. It identifies and removes anomalous events based on signal consistency over time. We run it on each sample and collect the cleaned frames.

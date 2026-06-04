@@ -14,11 +14,6 @@ output:
 
 ---
 
-```{r libraries, message=FALSE, warning=FALSE}
-library(flowCore)
-library(tidyverse)
-```
-
 ## Project structure and file naming
 
 ### Directory structure
@@ -73,14 +68,6 @@ You only need to create the folder once. Each time you restart R, run `setwd("~/
 
 ---
 
-## Data structures
-
-All flow cytometry data in R lives in two objects from the `flowCore` package:
-
-**`flowFrame`** — a single FCS file. Contains a matrix of expression values (one row per cell event and one column per measured parameter), parameter metadata, and FCS file keywords. Access the expression data directly with `exprs()`.
-
-**`flowSet`** — a collection of `flowFrame`s from one experiment. Lets you apply operations across all samples at once via `fsApply()`. Most of your work in this tutorial happens at the `flowSet` level.
-
 ## Stages of flow data
 
 Before loading anything, it is important to understand where in the processing pipeline your data sits.
@@ -97,8 +84,22 @@ Before loading anything, it is important to understand where in the processing p
 
 ## Loading the example data
 
-This tutorial uses the `GvHD` dataset built into the `flowCore` package — a longitudinal study of bone marrow transplant patients. Five patients were each measured at seven visits, giving 35 samples total. The panel is a conventional 4-color FITC/PE/PerCP/APC setup run on a FACScan. Differences from Cytek Aurora spectral data are noted throughout.
+```{r libraries, message=FALSE, warning=FALSE}
+library(flowCore)
+library(tidyverse)
+```
 
+This tutorial uses the `GvHD` dataset built into the `flowCore` package which is a longitudinal study of bone marrow transplant patients. Five patients were each measured at seven visits, giving 35 samples total. The panel is a conventional 4-color FITC/PE/PerCP/APC setup run on a FACScan. Differences from spectral data are noted throughout.
+
+## Data structures
+
+All flow cytometry data in R lives in two objects from the `flowCore` package:
+
+**`flowFrame`** — a single FCS file. Contains a matrix of expression values (one row per event and one column per measured parameter), parameter metadata, and FCS file keywords. Access the expression data directly with `exprs()`.
+
+**`flowSet`** — a collection of `flowFrame`s from one experiment. Lets you apply operations across all samples at once via `fsApply()`. Most of your work in this tutorial happens at the `flowSet` level.
+
+Use the code below to load your data and explore the `flowSet`:
 ```{r load_gvhd}
 data(GvHD)
 GvHD
@@ -121,7 +122,7 @@ colnames(GvHD)
 > ```
 > Always use `transformation = FALSE` so R loads raw linear values rather than applying its own default transformation. You will apply the transformation yourself in script 03.
 >
-> **Spectral flow note:** Unmixed FCS files from the Cytek Aurora will have one column per fluorochrome rather than one per detector. The number of columns depends on your panel size, not the number of Aurora detectors.
+> **Spectral flow note:** Unmixed FCS files will have one column per fluorochrome rather than one per detector. The number of columns depends on your panel size, not the number of detectors.
 
 ## Inspecting the flowSet
 
@@ -154,18 +155,18 @@ We add three columns that downstream scripts expect:
 
 ```{r add_metadata}
 meta <- pData(GvHD)
-meta$patient_id     <- as.character(meta$Patient)
-meta$treatment      <- ifelse(meta$Grade == 1, "Grade 1 (mild)", "Grade 3 (severe)")
+meta$patient_id <- as.character(meta$Patient)
+meta$treatment <- ifelse(meta$Grade == 1, "Grade 1 (mild)", "Grade 3 (severe)")
 meta$timepoint_days <- meta$Days
 pData(GvHD) <- meta
 pData(GvHD)[, c("patient_id", "treatment", "timepoint_days")]
 ```
 
-`treatment` is derived from GvHD severity grade — a real biological variable. Patients 5, 6, 7, and 9 have Grade 3 (severe GvHD); patient 10 has Grade 1 (mild). With only five patients this is a small dataset, but it is large enough to demonstrate the full pipeline.
+`treatment` is derived from GvHD severity grade, a real biological variable. Patients 5, 6, 7, and 9 have Grade 3 (severe GvHD); patient 10 has Grade 1 (mild). With only five patients this is a small dataset, but it is large enough to demonstrate the full pipeline.
 
 > **On your own data:** Your metadata would come from CSV files rather than a built-in dataset:
 > ```r
-> sample_meta     <- read_csv("metadata/sample_metadata.csv")
+> sample_meta <- read_csv("metadata/sample_metadata.csv")
 > experiment_meta <- read_csv("metadata/experiment_metadata.csv")
 > meta <- left_join(sample_meta, experiment_meta, by = "experiment_id") |> as.data.frame()
 > meta_ordered <- meta[match(sampleNames(fs), meta$filename), ]
