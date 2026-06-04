@@ -9,7 +9,7 @@ output:
 
 A step-by-step tutorial for analyzing flow cytometry data in R, built around the Cytek Aurora spectral flow cytometer. The pipeline covers everything from loading FCS files through statistical analysis.
 
-The example data used throughout is the GvHD dataset from the `flowCore` package — a longitudinal study of bone marrow transplant patients. It runs on conventional flow cytometry data, so a few steps differ from Aurora data (notably the transformation step). Differences are clearly noted in each script.
+The example data used throughout is the GvHD dataset from the `flowCore` package. This data originates from a longitudinal study of bone marrow transplant patients done on a conventional flow cytometer, so a few steps differ from spectral data (notably the transformation step). Differences are clearly noted in each script.
 
 ---
 
@@ -19,8 +19,8 @@ The example data used throughout is the GvHD dataset from the `flowCore` package
 |--------|----------------|
 | [01: Load and Metadata](scripts/01_load_and_metadata.html) | FCS format, flowFrame/flowSet, the three stages of flow data, loading and attaching metadata |
 | [02: QC](scripts/02_qc.html) | Temporal instability, margin events, PeacoQC |
-| [03: Transformation](scripts/03_transformation.html) | Checking `$PnE`, arcsinh vs. pre-transformed data |
-| [04: Gating](scripts/04_gating.html) | Sequential manual gating: scatter, singlets, population of interest |
+| [03: Transformation](scripts/03_transformation.html) | Checking `$PnE`, transformed vs. untransformed data |
+| [04: Gating](scripts/04_gating.html) | Sequential manual gating: scatter, singlets, populations of interest |
 | [05: Dimensionality Reduction](scripts/05_dimensionality_reduction.html) | UMAP |
 | [06: Clustering](scripts/06_clustering.html) | FlowSOM (optional — for discovery mode) |
 | [07: Analysis](scripts/07_analysis.html) | Cell frequencies, MFI, linear mixed models |

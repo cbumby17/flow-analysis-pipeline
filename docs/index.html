@@ -1504,10 +1504,10 @@ border-radius: 0px;
 around the Cytek Aurora spectral flow cytometer. The pipeline covers
 everything from loading FCS files through statistical analysis.</p>
 <p>The example data used throughout is the GvHD dataset from the
-<code>flowCore</code> package — a longitudinal study of bone marrow
-transplant patients. It runs on conventional flow cytometry data, so a
-few steps differ from Aurora data (notably the transformation step).
-Differences are clearly noted in each script.</p>
+<code>flowCore</code> package. This data originates from a longitudinal
+study of bone marrow transplant patients done on a conventional flow
+cytometer, so a few steps differ from spectral data (notably the
+transformation step). Differences are clearly noted in each script.</p>
 <hr />
 <div id="tutorial-scripts" class="section level2">
 <h2>Tutorial scripts</h2>
@@ -1535,11 +1535,11 @@ loading and attaching metadata</td>
 </tr>
 <tr class="odd">
 <td><a href="scripts/03_transformation.html">03: Transformation</a></td>
-<td>Checking <code>$PnE</code>, arcsinh vs. pre-transformed data</td>
+<td>Checking <code>$PnE</code>, transformed vs. untransformed data</td>
 </tr>
 <tr class="even">
 <td><a href="scripts/04_gating.html">04: Gating</a></td>
-<td>Sequential manual gating: scatter, singlets, population of
+<td>Sequential manual gating: scatter, singlets, populations of
 interest</td>
 </tr>
 <tr class="odd">
