@@ -6,13 +6,13 @@ A reproducible flow cytometry analysis pipeline in R, covering QC, transformatio
 
 ## Why R and not FlowJo?
 
-FlowJo is the standard in most flow labs and it's good at what it does — fast, visual, and familiar. But it has a reproducibility problem. When you gate in FlowJo, the decisions you make (where you drew the gate, what you excluded, how you defined a population) live in a workspace file that isn't human-readable and doesn't travel well. If someone asks how you got your numbers, the honest answer is often "open my workspace and look." You can't easily version-control it, diff it, or hand it to a collaborator who has a different FlowJo version.
+FlowJo is the standard in most flow labs and it's good at what it does. It's fast, visual, and familiar. But it has a reproducibility problem. When you gate in FlowJo, the decisions you make (where you drew the gate, what you excluded, how you defined a population) live in a workspace file that isn't human-readable and doesn't travel well. If someone asks how you got your numbers, the honest answer is often "open my workspace and look." You can't easily version-control it, or hand it to a collaborator who has a different FlowJo version.
 
-In R, every decision is written down. The gate boundaries are in the code. The transformation parameters are in the code. The statistical model is in the code. If a reviewer asks why you used arcsinh with a cofactor of 150, you can point to the line. If you need to rerun the analysis six months later with one sample excluded, you change one line and rerender. If a collaborator wants to apply the same pipeline to their data, they can.
+In R, every decision is written down. The gate boundaries are in the code. The transformation parameters are in the code. The statistical model is in the code. If you need to rerun the analysis six months later with one sample excluded, you change one line and rerun. If a collaborator wants to apply the same pipeline to their data, they can.
 
-The other practical advantage is that R keeps the entire analysis — from raw FCS files to final statistics — in one place. FlowJo exports numbers to Excel, Excel feeds GraphPad Prism, Prism generates figures. Every handoff is a place where something can go wrong or become disconnected from its source. R eliminates those handoffs.
+The other practical advantage is that R keeps the entire analysis, from raw FCS files to final statistics, in one place. FlowJo exports numbers to Excel, Excel feeds GraphPad Prism, Prism generates figures. Every handoff is a place where something can go wrong or become disconnected from its source. R eliminates those handoffs.
 
-FlowJo still has a real role for exploratory gating during panel development or quick QC checks. This pipeline is for the analysis you'd actually report.
+FlowJo still has a real role for exploratory gating during panel development or quick QC checks, however this pipeline is for the analysis you'd actually report.
 
 ## Prerequisites
 
@@ -27,19 +27,11 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocMana
 BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "PeacoQC", "FlowSOM"))
 ```
 
-## FCS file naming
+## Project structure and file naming
 
-Name your FCS files using underscores as separators and no spaces. A consistent naming scheme makes files easier to sort, load programmatically, and understand at a glance. A useful convention:
+### Directory structure
 
-```
-YYYYMMDD_mouseID_sex_treatment_timepoint_sampleSource_panel.fcs
-```
-
-For example: `20240603_M01_F_Salmonella_D7_SPL_CD8tet.fcs`
-
-The key rules: no spaces (use underscores), no special characters, be consistent with abbreviations throughout a project, and define any abbreviations you use in your experiment metadata before data collection begins.
-
-## Project structure
+Here is an example of how I suggest you structure your project directory.
 
 ```
 data/
@@ -61,3 +53,15 @@ output/
   figures/
   tables/
 ```
+
+### FCS file naming
+
+Use underscores as separators and avoid spaces and special characters. Spaces in filenames cause problems when loading files programmatically. A consistent naming scheme also makes files easier to sort and identify at a glance. A useful convention:
+
+```
+YYYYMMDD_mouseID_sex_treatment_timepoint_sampleSource_panel.fcs
+```
+
+For example: `20240603_M01_F_Salmonella_D7_SPL_CD8tet.fcs`
+
+Define any abbreviations you plan to use (sample sources, panel names, treatment groups) in your experiment metadata before data collection begins, and don't change them mid-project.
