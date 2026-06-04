@@ -37,32 +37,30 @@ Two transformations address both problems. Which one you use depends on how your
 
 **Logicle (biexponential)** — the standard for conventional flow cytometry. Linear near zero (handles negatives gracefully) and logarithmic at high values. See Parks et al., 2006 in *Cytometry A*.
 
-**Arcsinh** — the standard for mass cytometry (CyTOF) and modern spectral flow including the Cytek Aurora. The `b` parameter controls the linear-to-log transition (`b = 1/cofactor`; cofactor 150 is standard for flow cytometry). Apply only to fluorochrome channels — scatter parameters (FSC, SSC) are already on a meaningful linear scale and should not be transformed. See Bendall et al., 2011 in *Science*.
+**Arcsinh** — the standard for mass cytometry (CyTOF) and modern spectral flow. The `b` parameter controls the linear-to-log transition (`b = 1/cofactor`; cofactor 150 is standard for flow cytometry). Apply only to fluorochrome channels: scatter parameters (FSC, SSC) are already on a meaningful linear scale and should not be transformed. See Bendall et al., 2011 in *Science*.
 
 The GvHD dataset was collected on a conventional cytometer with hardware log amplifiers, which means the transformation was applied before the signal was even digitized. This makes the `$PnE` check especially important here.
 
 ## Checking `$PnE` before transforming
 
-Before applying any transformation, check the `$PnE` keyword to confirm how the data is stored. `$PnE = "0,0"` means untransformed linear — you apply arcsinh yourself. Anything else means a transformation was already applied at acquisition or export.
+Run this on every new dataset before doing anything else:
 
 ```{r check_pne}
 keyword(gs_pop_get_data(gs, "root")[[1]], paste0("$P", 1:7, "E"))
 ```
 
-For this dataset, the scatter channels (FSC.H, SSC.H) are `"0,0"` — linear, as expected. The fluorescence channels (FL1.H, FL2.H, FL3.H, FL4.H) are `"4,0"`, which means the data was collected through a log amplifier and stored on a 4-decade log scale. **This data is already transformed.** Applying arcsinh on top of it would be wrong and would make the data difficult to interpret.
+The scatter channels (FSC.H, SSC.H) are `"0,0"` — untransformed linear values, as expected. The fluorescence channels (FL1.H–FL4.H) are `"4,0"`, which means a log transformation was already applied in hardware before the signal was digitized. **Applying another transformation on top would be wrong.**
 
-This is a fundamental difference between conventional cytometers and modern digital instruments like the Cytek Aurora. On the Aurora, data is captured as linear detector voltages and stored with `$PnE = "0,0"` — you choose and apply the transformation yourself in R. On older conventional cytometers with analog electronics, the log transformation happens in hardware before the signal is digitized. Always check `$PnE` before doing anything.
-
-For reference, the `"4,0"` format means the stored channel value $x$ was generated from the original signal $y$ as:
+On a modern instrument like the Cytek Aurora, fluorescence channels are stored as linear values (`$PnE = "0,0"`) and you apply arcsinh yourself in R. On older conventional cytometers with analog electronics, the log transformation happens before digitization and arrives baked into the file. The `"4,0"` value tells you the data is on a 4-decade log scale:
 
 $$x = \frac{R}{f_1} \log_{10}(y)$$
 
-where $R$ is the channel range and $f_1 = 4$ is the number of log decades. So the raw stored value is already on a log scale with 4 decades of dynamic range.
+where $x$ is the stored channel value, $y$ is the original signal, $R$ is the channel range, and $f_1 = 4$ is the number of log decades.
 
-Since this data is pre-transformed, we skip arcsinh and visualize the fluorescence channels directly. You should see clear populations.
+Since this data is pre-transformed, we skip straight to visualization.
 
 ```{r visualize, fig.width=12, fig.height=6, warning=FALSE, message=FALSE}
-ggcyto(fs[1:6], aes(x = "FL1.H", y = "FL2.H")) +
+ggcyto(gs[1:6], aes(x = "FL1.H", y = "FL2.H"), subset = "root") +
   geom_hex(bins = 50) +
   facet_wrap(~name) +
   labs(title = "FL1.H vs FL2.H — log-amplified, no additional transformation needed")
@@ -76,7 +74,7 @@ save_gs(gs, path = "data/processed/GvHD_tcell_gs_base")
 cat("GatingSet saved to data/processed/GvHD_tcell_gs_base\n")
 ```
 
-> For Cytek Aurora data: load the QC-cleaned flowSet, verify `$PnE = "0,0"` for all fluorochrome channels, then apply arcsinh with cofactor 150:
+> For spectral data: load the QC-cleaned flowSet, verify `$PnE = "0,0"` for all fluorochrome channels, then apply arcsinh with cofactor 150:
 > ```r
 > fluor_channels <- c("B515.A", "V525.A", ...)  # your panel's channels
 > asinhTrans <- arcsinhTransform(transformationId = "arcsinh", a = 0, b = 1/150, c = 0)
