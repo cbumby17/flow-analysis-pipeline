@@ -172,13 +172,16 @@ df_sing <- get_pop_df(gs, "singlets")
 
 ggplot(df_sing, aes(x = CD15_FITC_H)) +
   geom_density(fill = "steelblue", alpha = 0.4) +
+  scale_x_log10() +
   facet_wrap(~sample, ncol = 5) +
   theme_minimal(base_size = 10) +
-  labs(title = "CD15 (FITC) — bimodal distribution, CD15+ granulocytes on the right",
-       x = "CD15_FITC_H", y = "Density")
+  labs(title = "CD15 (FITC) — CD15+ granulocytes visible as the right-hand peak",
+       x = "CD15_FITC_H (log scale)", y = "Density")
 ```
 
-The valley between the two peaks falls around 500–800. We set the threshold at 1000 to sit clearly in the negative side of the valley.
+The data is hardware-log amplified: the stored values 1–10000 represent 4 decades of true fluorescence. On a linear x-axis, negative cells (stored values ~1–17) compress into an invisible spike near zero. `scale_x_log10()` spreads the axis out to show both peaks — this is how FlowJo and other flow software display this type of data, and it is the standard way to look at it.
+
+The valley between the two peaks falls around x = 500–1000. We set the threshold at 1000.
 
 ```{r population_gate}
 population_gate <- rectangleGate(
@@ -194,10 +197,11 @@ recompute(gs)
 ggplot(df_sing, aes(x = CD15_FITC_H)) +
   geom_density(fill = "steelblue", alpha = 0.4) +
   geom_vline(xintercept = 1000, color = "red", linetype = "dashed", linewidth = 0.8) +
+  scale_x_log10() +
   facet_wrap(~sample, ncol = 5) +
   theme_minimal(base_size = 10) +
   labs(title = "CD15+ gate threshold (red dashed line)",
-       x = "CD15_FITC_H", y = "Density")
+       x = "CD15_FITC_H (log scale)", y = "Density")
 ```
 
 Check the cell counts at each gate across all samples. Large drops between steps are worth investigating.
