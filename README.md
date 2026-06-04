@@ -26,3 +26,5 @@ install.packages(c("tidyverse", "uwot", "lme4", "emmeans", "gridExtra"))
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "PeacoQC", "FlowSOM"))
 ```
+
+---
