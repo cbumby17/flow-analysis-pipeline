@@ -5,22 +5,11 @@ output:
     theme: cosmo
     toc: true
     toc_float: true
+    includes:
+      after_body: _nav.html
 ---
 
-<div style="display:flex; gap:8px; margin-bottom:1.5em; align-items:center; flex-wrap:wrap;">
-<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
-<div class="btn-group">
-<button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">Scripts <span class="caret"></span></button>
-<ul class="dropdown-menu">
-<li><a href="01_load_and_metadata.html">01: Load and Metadata</a></li>
-<li><a href="02_qc.html">02: QC</a></li>
-<li><a href="03_transformation.html">03: Transformation</a></li>
-<li><a href="04_gating.html">04: Gating</a></li>
-<li><a href="05_dimensionality_reduction.html">05: Dimensionality Reduction</a></li>
-<li><a href="06_clustering.html">06: Clustering</a></li>
-<li><a href="07_analysis.html">07: Analysis</a></li>
-</ul>
-</div>
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
 <a href="03_transformation.html" class="btn btn-default btn-sm">← Prev: Transformation</a>
 <a href="05_dimensionality_reduction.html" class="btn btn-primary btn-sm">Next: Dimensionality Reduction →</a>
 </div>
@@ -55,7 +44,7 @@ Every downstream number in this analysis is a direct consequence of where these 
 
 **A note on this dataset:** the GvHD data was collected on a conventional FACScan with only height (H) and one area (A) parameter — specifically FL2.A. Modern instruments record FSC-Area and SSC-Area which are the standard channels for singlet discrimination. We'll work with what this dataset provides.
 
-Start with the scatter gate to isolate lymphocytes from debris. Visualize first to understand the data before setting values.
+Start with a scatter gate to exclude debris and retain intact leukocytes. Visualize first to understand the data before setting values.
 
 ```{r scatter_vis, fig.width=12, fig.height=16, warning=FALSE}
 df_all <- get_pop_df(gs, "root")
@@ -65,18 +54,18 @@ ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
   scale_fill_viridis_c() +
   facet_wrap(~sample, ncol = 5) +
   theme_minimal(base_size = 10) +
-  labs(title = "All events — identify lymphocyte cluster before setting gate")
+  labs(title = "All events — identify the leukocyte region before setting gate")
 ```
 
-FSC (forward scatter) measures cell size, meaning larger cells deflect more light forward. SSC (side scatter) measures internal complexity or granularity, so cells with more granules or a more complex internal structure scatter more light to the side. Together they separate the major cell populations without any antibody staining: lymphocytes are small and relatively agranular, so they appear as a tight cluster in the lower-left. Monocytes sit above and to the right (larger, more granular). Debris falls below the lymphocyte cluster as a diffuse cloud near the plot origin.
+FSC (forward scatter) reflects cell size — larger cells deflect more light forward. SSC (side scatter) reflects internal complexity — granule-rich cells scatter more light to the side. The major populations separate as follows: debris falls as a diffuse cloud at very low FSC; lymphocytes sit as a compact cluster at low-to-mid FSC and low SSC; monocytes are larger with intermediate SSC; granulocytes are the most granular and sit at high SSC. For a myeloid panel like this one, the gate should include the full leukocyte region — lymphocytes, monocytes, and granulocytes — not just the lymphocyte cluster. Restricting to low SSC would exclude the granulocytes we're interested in.
 
-Look at the plots above and identify that lower-left lymphocyte cluster. The gate boundaries you set should wrap around it while excluding debris below and monocytes above. `rectangleGate()` defines a rectangular region by specifying a minimum and maximum value on each axis: `c(100, 850)` means "keep events where FSC.H is between 100 and 850", and `c(0, 500)` means "keep events where SSC.H is between 0 and 500". Read the axis values off your visualization to decide where the boundaries should fall for your data — they will be different for every instrument and panel.
+`rectangleGate()` defines a rectangular region: `c(100, 850)` keeps events where FSC.H is between 100 and 850, `c(0, 900)` keeps everything below SSC.H = 900. Read the axis values off your visualization to decide where your own data's boundaries should fall — they differ by instrument and panel.
 
 ```{r scatter_gate}
 scatter_gate <- rectangleGate(
-  filterId = "lymphocytes",
+  filterId = "leukocytes",
   "FSC.H"  = c(100, 850),
-  "SSC.H"  = c(0, 500)
+  "SSC.H"  = c(0, 900)
 )
 
 gs_pop_add(gs, scatter_gate, parent = "root")
@@ -87,17 +76,17 @@ recompute(gs)
 ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
   geom_hex(bins = 60) +
   scale_fill_viridis_c() +
-  geom_rect(aes(xmin = 100, xmax = 850, ymin = 0, ymax = 500),
+  geom_rect(aes(xmin = 100, xmax = 850, ymin = 0, ymax = 900),
             fill = NA, color = "red", linewidth = 0.8, inherit.aes = FALSE) +
   facet_wrap(~sample, ncol = 5) +
   theme_minimal(base_size = 10) +
-  labs(title = "Lymphocyte gate (red box)")
+  labs(title = "Leukocyte gate (red box)")
 ```
 
 For singlet discrimination, modern instruments use FSC-Height vs FSC-Area: single cells fall on a tight diagonal, doublets appear above it. This dataset doesn't have FSC-Area, so we use CD45_PE_H vs CD45_PE_A — the height and area measurements of the CD45 (PE) channel — which captures the same doublet-exclusion principle. On spectral data, use `FSC.A` vs `FSC.H` instead.
 
 ```{r singlet_vis, fig.width=12, fig.height=16, warning=FALSE}
-df_lymph <- get_pop_df(gs, "lymphocytes")
+df_lymph <- get_pop_df(gs, "leukocytes")
 
 ggplot(df_lymph, aes(x = CD45_PE_A, y = CD45_PE_H)) +
   geom_hex(bins = 60) +
@@ -123,7 +112,7 @@ singlet_gate <- polygonGate(
   )
 )
 
-gs_pop_add(gs, singlet_gate, parent = "lymphocytes")
+gs_pop_add(gs, singlet_gate, parent = "leukocytes")
 recompute(gs)
 ```
 
@@ -147,9 +136,9 @@ ggplot(df_lymph, aes(x = CD45_PE_A, y = CD45_PE_H)) +
 > ```r
 > library(flowStats)
 > # Fit to a representative sample, then apply to all
-> ff <- gh_pop_get_data(gs[[1]], "lymphocytes")
+> ff <- gh_pop_get_data(gs[[1]], "leukocytes")
 > sg <- singletGate(ff, area = "CD45_PE_A", height = "CD45_PE_H")
-> gs_pop_add(gs, sg, parent = "lymphocytes")
+> gs_pop_add(gs, sg, parent = "leukocytes")
 > recompute(gs)
 > ```
 > This is particularly useful when gating many samples where the singlet population shifts between runs, or when you want a fully reproducible gate that doesn't rely on manually chosen coordinates.
@@ -229,20 +218,7 @@ cat("Gated GatingSet saved\n")
 ```
 
 <hr>
-<div style="display:flex; gap:8px; margin-top:1.5em; align-items:center; flex-wrap:wrap;">
-<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
-<div class="btn-group">
-<button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">Scripts <span class="caret"></span></button>
-<ul class="dropdown-menu">
-<li><a href="01_load_and_metadata.html">01: Load and Metadata</a></li>
-<li><a href="02_qc.html">02: QC</a></li>
-<li><a href="03_transformation.html">03: Transformation</a></li>
-<li><a href="04_gating.html">04: Gating</a></li>
-<li><a href="05_dimensionality_reduction.html">05: Dimensionality Reduction</a></li>
-<li><a href="06_clustering.html">06: Clustering</a></li>
-<li><a href="07_analysis.html">07: Analysis</a></li>
-</ul>
-</div>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
 <a href="03_transformation.html" class="btn btn-default btn-sm">← Prev: Transformation</a>
 <a href="05_dimensionality_reduction.html" class="btn btn-primary btn-sm">Next: Dimensionality Reduction →</a>
 </div>

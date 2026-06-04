@@ -5,22 +5,11 @@ output:
     theme: cosmo
     toc: true
     toc_float: true
+    includes:
+      after_body: _nav.html
 ---
 
-<div style="display:flex; gap:8px; margin-bottom:1.5em; align-items:center; flex-wrap:wrap;">
-<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
-<div class="btn-group">
-<button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">Scripts <span class="caret"></span></button>
-<ul class="dropdown-menu">
-<li><a href="01_load_and_metadata.html">01: Load and Metadata</a></li>
-<li><a href="02_qc.html">02: QC</a></li>
-<li><a href="03_transformation.html">03: Transformation</a></li>
-<li><a href="04_gating.html">04: Gating</a></li>
-<li><a href="05_dimensionality_reduction.html">05: Dimensionality Reduction</a></li>
-<li><a href="06_clustering.html">06: Clustering</a></li>
-<li><a href="07_analysis.html">07: Analysis</a></li>
-</ul>
-</div>
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
 <a href="06_clustering.html" class="btn btn-default btn-sm">← Prev: Clustering</a>
 </div>
 
@@ -49,7 +38,7 @@ We report frequencies as percentage of the parent gate rather than absolute cell
 stats <- gs_pop_get_stats(gs, nodes = gs_get_pop_paths(gs), type = "percent")
 
 freq_df <- stats %>%
-  dplyr::filter(pop == "/lymphocytes/singlets/population_of_interest") %>%
+  dplyr::filter(pop == "/leukocytes/singlets/population_of_interest") %>%
   rename(pct_of_singlets = percent) %>%
   left_join(meta, by = "sample")
 
@@ -150,19 +139,6 @@ write_csv(mfi_df,  "output/tables/GvHD_tcell_mfi.csv")
 ```
 
 <hr>
-<div style="display:flex; gap:8px; margin-top:1.5em; align-items:center; flex-wrap:wrap;">
-<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
-<div class="btn-group">
-<button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">Scripts <span class="caret"></span></button>
-<ul class="dropdown-menu">
-<li><a href="01_load_and_metadata.html">01: Load and Metadata</a></li>
-<li><a href="02_qc.html">02: QC</a></li>
-<li><a href="03_transformation.html">03: Transformation</a></li>
-<li><a href="04_gating.html">04: Gating</a></li>
-<li><a href="05_dimensionality_reduction.html">05: Dimensionality Reduction</a></li>
-<li><a href="06_clustering.html">06: Clustering</a></li>
-<li><a href="07_analysis.html">07: Analysis</a></li>
-</ul>
-</div>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
 <a href="06_clustering.html" class="btn btn-default btn-sm">← Prev: Clustering</a>
 </div>

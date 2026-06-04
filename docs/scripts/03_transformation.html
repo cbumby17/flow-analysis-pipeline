@@ -1500,37 +1500,7 @@ border-radius: 0px;
 </div>
 
 
-<div style="display:flex; gap:8px; margin-bottom:1.5em; align-items:center; flex-wrap:wrap;">
-<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
-<div class="btn-group">
-<button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">
-Scripts <span class="caret"></span>
-</button>
-<ul class="dropdown-menu">
-<li>
-<a href="01_load_and_metadata.html">01: Load and Metadata</a>
-</li>
-<li>
-<a href="02_qc.html">02: QC</a>
-</li>
-<li>
-<a href="03_transformation.html">03: Transformation</a>
-</li>
-<li>
-<a href="04_gating.html">04: Gating</a>
-</li>
-<li>
-<a href="05_dimensionality_reduction.html">05: Dimensionality
-Reduction</a>
-</li>
-<li>
-<a href="06_clustering.html">06: Clustering</a>
-</li>
-<li>
-<a href="07_analysis.html">07: Analysis</a>
-</li>
-</ul>
-</div>
+<div style="display:flex; gap:8px; margin-bottom:1.5em;">
 <p><a href="02_qc.html" class="btn btn-default btn-sm">← Prev: QC</a>
 <a href="04_gating.html" class="btn btn-primary btn-sm">Next: Gating
 →</a></p>
@@ -1640,43 +1610,49 @@ transList &lt;- transformList(fluor_channels, asinhTrans)
 fs_transformed &lt;- transform(fs, transList)</code></pre>
 </blockquote>
 <hr>
-<div style="display:flex; gap:8px; margin-top:1.5em; align-items:center; flex-wrap:wrap;">
-<a href="../index.html" class="btn btn-default btn-sm">← Home</a>
-<div class="btn-group">
-<button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">
-Scripts <span class="caret"></span>
-</button>
-<ul class="dropdown-menu">
-<li>
-<a href="01_load_and_metadata.html">01: Load and Metadata</a>
-</li>
-<li>
-<a href="02_qc.html">02: QC</a>
-</li>
-<li>
-<a href="03_transformation.html">03: Transformation</a>
-</li>
-<li>
-<a href="04_gating.html">04: Gating</a>
-</li>
-<li>
-<a href="05_dimensionality_reduction.html">05: Dimensionality
-Reduction</a>
-</li>
-<li>
-<a href="06_clustering.html">06: Clustering</a>
-</li>
-<li>
-<a href="07_analysis.html">07: Analysis</a>
-</li>
-</ul>
-</div>
+<div style="display:flex; gap:8px; margin-top:1.5em;">
 <p><a href="02_qc.html" class="btn btn-default btn-sm">← Prev: QC</a>
 <a href="04_gating.html" class="btn btn-primary btn-sm">Next: Gating
 →</a></p>
 </div>
 </div>
 
+<script>
+$(document).ready(function() {
+  var scripts = [
+    ["01_load_and_metadata.html", "01: Load and Metadata"],
+    ["02_qc.html", "02: QC"],
+    ["03_transformation.html", "03: Transformation"],
+    ["04_gating.html", "04: Gating"],
+    ["05_dimensionality_reduction.html", "05: Dimensionality Reduction"],
+    ["06_clustering.html", "06: Clustering"],
+    ["07_analysis.html", "07: Analysis"]
+  ];
+
+  var current = window.location.pathname.split("/").pop();
+
+  var items = scripts.map(function(s) {
+    var isActive = current === s[0];
+    return '<li style="padding:2px 0;">' +
+      (isActive
+        ? '<span style="font-weight:600; color:#2c3e50; font-size:13px;">' + s[1] + '</span>'
+        : '<a href="' + s[0] + '" style="font-size:13px; color:#555; text-decoration:none;">' + s[1] + '</a>') +
+      '</li>';
+  }).join('');
+
+  var html = [
+    '<div style="padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #e8e8e8;">',
+    '<a href="../index.html" style="font-size:12px; color:#888; display:block; margin-bottom:8px; text-decoration:none;">← Home</a>',
+    '<div style="font-size:11px; font-weight:600; color:#aaa; text-transform:uppercase; letter-spacing:.8px; margin-bottom:6px;">Tutorial Scripts</div>',
+    '<ul style="list-style:none; padding:0; margin:0;">', items, '</ul>',
+    '</div>'
+  ].join('');
+
+  if ($('#TOC').length) {
+    $('#TOC').prepend(html);
+  }
+});
+</script>
 
 
 </div>
