@@ -5,6 +5,8 @@ output:
     theme: cosmo
     toc: true
     toc_float: true
+    includes:
+      after_body: _nav_index.html
 ---
 
 A step-by-step tutorial for analyzing flow cytometry data in R, built around the Cytek Aurora spectral flow cytometer. The pipeline covers everything from loading FCS files through statistical analysis.
