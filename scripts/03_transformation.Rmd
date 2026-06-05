@@ -115,24 +115,27 @@ transList  <- transformList(fluor_all, asinhTrans)
 ff_transformed <- transform(ff_unmixed, transList)
 ```
 
-Visualise the effect — both the negative lobe (cells not expressing the marker) and a positive population should now be visible for markers like CD3 and CD4:
+The clearest demonstration of what transformation does: plot CD4 vs CD8 before and after. Before, all signal is compressed into a tiny corner and populations are invisible. After, three populations separate cleanly — CD4+ T helper cells, CD8+ cytotoxic T cells, and double-negative non-T cells.
 
-```{r vis_transform, fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
-before <- as.data.frame(exprs(ff_unmixed)[, fluor_channels]) %>%
-  pivot_longer(everything(), names_to = "channel", values_to = "value") %>%
-  mutate(stage = "Before")
+```{r vis_transform, fig.width=10, fig.height=4, warning=FALSE, message=FALSE}
+df_before <- as.data.frame(exprs(ff_unmixed)[, c("CD4_AF700", "CD8a_BV785")])
+df_after  <- as.data.frame(exprs(ff_transformed)[, c("CD4_AF700", "CD8a_BV785")])
 
-after <- as.data.frame(exprs(ff_transformed)[, fluor_channels]) %>%
-  pivot_longer(everything(), names_to = "channel", values_to = "value") %>%
-  mutate(stage = "After arcsinh")
+p1 <- ggplot(df_before, aes(x = CD4_AF700, y = CD8a_BV785)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c() +
+  theme_minimal(base_size = 11) +
+  labs(title = "Before arcsinh — all signal compressed into one corner",
+       x = "CD4 (raw)", y = "CD8a (raw)")
 
-bind_rows(before, after) %>%
-  mutate(stage = factor(stage, levels = c("Before", "After arcsinh"))) %>%
-  ggplot(aes(x = value)) +
-  geom_density(fill = "steelblue", alpha = 0.5) +
-  facet_grid(stage ~ channel, scales = "free") +
-  theme_minimal(base_size = 9) +
-  labs(title = "Arcsinh transformation — before and after", x = NULL, y = "Density")
+p2 <- ggplot(df_after, aes(x = CD4_AF700, y = CD8a_BV785)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c() +
+  theme_minimal(base_size = 11) +
+  labs(title = "After arcsinh — CD4+, CD8+, and double-negative populations visible",
+       x = "CD4 (arcsinh)", y = "CD8a (arcsinh)")
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
 ```
 
 ## Save
