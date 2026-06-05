@@ -24,7 +24,8 @@ install.packages(c("tidyverse", "uwot", "lme4", "emmeans", "gridExtra"))
 
 # Bioconductor
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto", "PeacoQC", "FlowSOM"))
+BiocManager::install(c("flowCore", "flowWorkspace", "openCyto", "ggcyto",
+                       "PeacoQC", "FlowSOM", "flowSpecs"))
 ```
 
 ---
