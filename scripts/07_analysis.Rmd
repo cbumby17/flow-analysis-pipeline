@@ -19,123 +19,137 @@ output:
 library(flowWorkspace)
 library(tidyverse)
 library(ggplot2)
-library(lme4)
-library(emmeans)
 ```
 
 ```{r load}
-gs   <- load_gs("data/processed/GvHD_tcell_gs")
-meta <- pData(gs) %>% rownames_to_column("sample")
+gs <- load_gs("data/processed/PBMC_gs_gated")
 ```
 
-This script extracts the numbers we actually want to compare across groups: cell frequencies and marker expression (MFI). Everything before this was preparation — this is where we answer the biological question.
+This script extracts the numbers we actually want to report: cell frequencies and marker expression. With a single PBMC sample we can demonstrate the extraction and visualisation code. Statistical comparisons between groups require multiple samples — the code structure for that is shown at the end of this script.
 
 ## Cell frequencies
 
-We report frequencies as percentage of the parent gate rather than absolute cell counts. Absolute counts depend on how much sample you started with, which introduces variation unrelated to biology. Percentage of parent is the standard in flow cytometry.
+### T cell frequency
 
-```{r extract_frequencies}
+Report frequencies as percentage of the parent gate rather than absolute counts. Absolute counts depend on how much sample you started with, which introduces variation unrelated to biology.
+
+```{r frequencies}
 stats <- gs_pop_get_stats(gs, nodes = gs_get_pop_paths(gs), type = "percent")
-
-freq_df <- stats %>%
-  dplyr::filter(pop == "/leukocytes/singlets/population_of_interest") %>%
-  rename(pct_of_singlets = percent) %>%
-  left_join(meta, by = "sample")
-
-freq_df
+stats
 ```
 
-Use a dotplot with individual points rather than a bar chart. Bar charts hide the sample-level distribution and make it hard to see outliers or small group sizes. The crossbar shows the group mean.
+```{r tcell_freq}
+tcell_pct <- stats %>%
+  dplyr::filter(pop == "/leukocytes/singlets/live/T_cells") %>%
+  pull(percent)
 
-```{r plot_frequencies, fig.width=5, fig.height=4, warning=FALSE}
-ggplot(freq_df, aes(x = treatment, y = pct_of_singlets, color = treatment)) +
-  geom_jitter(width = 0.1, size = 2.5) +
-  stat_summary(fun = mean, geom = "crossbar", width = 0.3, color = "black") +
-  theme_minimal() +
-  labs(
-    y     = "Population of interest (% of singlets)",
-    x     = NULL,
-    title = "Cell frequency by GvHD status"
-  ) +
-  theme(legend.position = "none")
+cat("T cells as % of live singlets:", round(tcell_pct * 100, 1), "%\n")
 ```
 
-Also worth plotting how frequency changes over time within patients:
+### CD4 and CD8 frequencies within T cells
 
-```{r plot_longitudinal, fig.width=7, fig.height=4, warning=FALSE}
-ggplot(freq_df, aes(x = timepoint_days, y = pct_of_singlets,
-                    color = treatment, group = patient_id)) +
-  geom_line(alpha = 0.6) +
-  geom_point(size = 2) +
-  theme_minimal() +
-  labs(
-    x     = "Days post-transplant",
-    y     = "Population of interest (% of singlets)",
-    title = "Longitudinal cell frequency per patient"
-  )
+```{r cd4_cd8}
+tcell_data <- gs_pop_get_data(gs, "T_cells")
+expr_tcell <- as.data.frame(exprs(tcell_data[[1]]))
+
+# Gate CD4 and CD8 within T cells using the transformed data
+cd4_pct <- mean(expr_tcell$CD4_AF700 > 1.0) * 100
+cd8_pct <- mean(expr_tcell$CD8a_BV785 > 1.0) * 100
+
+cat("CD4+ T cells:", round(cd4_pct, 1), "%\n")
+cat("CD8+ T cells:", round(cd8_pct, 1), "%\n")
+cat("CD4:CD8 ratio:", round(cd4_pct / cd8_pct, 2), "\n")
 ```
+
+A typical healthy adult has a CD4:CD8 ratio of 1.5–2.5. Values outside this range can indicate immune dysregulation.
 
 ## Marker expression (MFI)
 
-MFI (median fluorescence intensity) tells you how much of a marker is expressed on a per-cell basis within a gated population. We use median rather than mean because the distributions are sometimes skewed.
+Median fluorescence intensity (MFI) tells you how much of a marker is expressed on a per-cell basis. Use median rather than mean because flow distributions are often skewed.
 
-```{r extract_mfi}
-fluor_channels <- c("CD15_FITC_H", "CD45_PE_H", "CD14_PerCP_H", "CD33_APC_H")
+```{r mfi}
+marker_channels <- c("CD3_PB", "CD4_AF700", "CD8a_BV785",
+                     "CD45RA_PECy7", "CD14_BV605", "CD19_APCCy7")
 
-pop_data <- gs_pop_get_data(gs, "population_of_interest")
+mfi_vals <- sapply(marker_channels, function(ch) {
+  median(expr_tcell[[ch]])
+})
 
-mfi_list <- fsApply(pop_data, function(ff) {
-  vals <- apply(exprs(ff)[, fluor_channels, drop = FALSE], 2, median)
-  as.data.frame(t(vals))
-}, simplify = FALSE)
-
-mfi_df <- bind_rows(mfi_list, .id = "sample") %>%
-  left_join(meta, by = "sample")
-
-head(mfi_df[, c("sample", "CD15_FITC_H", "CD45_PE_H", "treatment")])
+data.frame(marker = names(mfi_vals), median_expression = round(mfi_vals, 3))
 ```
 
-```{r plot_mfi, fig.width=5, fig.height=4, warning=FALSE}
-ggplot(mfi_df, aes(x = treatment, y = .data[["CD15_FITC_H"]], color = treatment)) +
-  geom_jitter(width = 0.1, size = 2.5) +
-  stat_summary(fun = median, geom = "crossbar", width = 0.3, color = "black") +
-  theme_minimal() +
-  labs(
-    y     = "CD15 MFI",
-    x     = NULL,
-    title = "CD15 expression by GvHD status"
-  ) +
-  theme(legend.position = "none")
+```{r mfi_plot, fig.width=7, fig.height=4, warning=FALSE}
+data.frame(marker = names(mfi_vals), MFI = mfi_vals) %>%
+  ggplot(aes(x = reorder(marker, MFI), y = MFI)) +
+  geom_col(fill = "steelblue", alpha = 0.8) +
+  coord_flip() +
+  theme_minimal(base_size = 11) +
+  labs(title = "Median marker expression in T cells",
+       x = NULL, y = "MFI (arcsinh)")
 ```
 
-## Statistical comparisons
+## CD45RA: naive vs memory T cells
 
-This is a longitudinal dataset with repeated measurements per patient — the same patients are measured at multiple visits. We use a linear mixed model with patient as a random effect to account for this. For mouse experiments, use cage as the random effect instead (see model comment below).
+CD45RA distinguishes naive T cells (high CD45RA, never encountered antigen) from memory T cells (low CD45RA, have been activated). Plotting CD45RA against CD4 or CD8 shows the naive/memory breakdown within each T cell subset.
 
-```{r stats_frequency}
-model_freq <- lmer(pct_of_singlets ~ treatment + timepoint_days + (1 | patient_id),
-                   data = freq_df)
-summary(model_freq)
+```{r naive_memory, fig.width=8, fig.height=4, warning=FALSE}
+p1 <- ggplot(expr_tcell, aes(x = CD4_AF700, y = CD45RA_PECy7)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c() +
+  theme_minimal(base_size = 10) +
+  labs(title = "CD4 T cells: naive vs memory")
+
+p2 <- ggplot(expr_tcell, aes(x = CD8a_BV785, y = CD45RA_PECy7)) +
+  geom_hex(bins = 60) +
+  scale_fill_viridis_c() +
+  theme_minimal(base_size = 10) +
+  labs(title = "CD8 T cells: naive vs memory")
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
 ```
 
-```{r emmeans_frequency}
-emmeans(model_freq, pairwise ~ treatment)
+## Statistical comparisons with multiple samples
+
+The analyses above work on a single sample. For a real experiment comparing groups (e.g., healthy vs. disease, pre- vs. post-treatment), you would apply the same extraction code across all samples and then model the resulting data frame.
+
+The data structure you would build:
+
+```r
+# Extract frequencies for all samples
+freq_df <- gs_pop_get_stats(gs_multi,
+                             nodes = "/leukocytes/singlets/live/T_cells",
+                             type  = "percent") %>%
+  rename(tcell_pct = percent) %>%
+  left_join(pData(gs_multi) %>% rownames_to_column("sample"), by = "sample")
 ```
 
-```{r stats_mfi}
-model_mfi <- lmer(mfi_df[["CD15_FITC_H"]] ~ treatment + timepoint_days + (1 | patient_id),
-                  data = mfi_df)
+For a longitudinal experiment with repeated measures per patient, a linear mixed model accounts for the within-patient correlation:
 
-emmeans(model_mfi, pairwise ~ treatment)
+```r
+library(lme4)
+library(emmeans)
+
+model <- lmer(tcell_pct ~ treatment + timepoint_days + (1 | patient_id),
+              data = freq_df)
+summary(model)
+emmeans(model, pairwise ~ treatment)
 ```
 
-> For mouse experiments, replace `(1 | patient_id)` with `(1 | cage)` and `timepoint_days` with your experimental timepoint variable. Always include cage as a random effect in mouse studies — animals within the same cage share environment, microbiome, and social conditions, and this is almost always a confound.
+For mouse experiments, replace `(1 | patient_id)` with `(1 | cage)`. Always include cage as a random effect in mouse studies — animals in the same cage share environment, microbiome, and social conditions, and this almost always confounds group comparisons.
 
 ```{r save_results}
 dir.create("output/tables", recursive = TRUE, showWarnings = FALSE)
 
-write_csv(freq_df, "output/tables/GvHD_tcell_frequencies.csv")
-write_csv(mfi_df,  "output/tables/GvHD_tcell_mfi.csv")
+write_csv(
+  data.frame(
+    sample = "PBMC",
+    tcell_pct = tcell_pct,
+    cd4_pct = cd4_pct,
+    cd8_pct = cd8_pct,
+    cd4_cd8_ratio = cd4_pct / cd8_pct
+  ),
+  "output/tables/PBMC_frequencies.csv"
+)
 ```
 
 <hr>

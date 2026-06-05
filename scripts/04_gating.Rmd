@@ -10,7 +10,7 @@ output:
 ---
 
 <div style="display:flex; gap:8px; margin-bottom:1.5em;">
-<a href="03_transformation.html" class="btn btn-default btn-sm">← Prev: Transformation</a>
+<a href="03_transformation.html" class="btn btn-default btn-sm">← Prev: Unmixing & Transformation</a>
 <a href="05_dimensionality_reduction.html" class="btn btn-primary btn-sm">Next: Dimensionality Reduction →</a>
 </div>
 
@@ -24,76 +24,67 @@ library(tidyverse)
 ```
 
 ```{r load}
-gs <- load_gs("data/processed/GvHD_tcell_gs_base")
+gs <- load_gs("data/processed/PBMC_gs_transformed")
 ```
 
 ```{r plot_helper, include=FALSE}
-# Helper: extract expression data from a gating population for ggplot2 plotting
 get_pop_df <- function(gs, pop) {
   fsApply(gs_pop_get_data(gs, pop), function(ff) {
-    as.data.frame(exprs(ff)) %>% mutate(sample = identifier(ff))
+    df <- as.data.frame(exprs(ff))
+    colnames(df) <- make.names(colnames(df))
+    df %>% mutate(sample = identifier(ff))
   }, simplify = FALSE) %>% do.call(rbind, .)
 }
 ```
 
-Gating is sequential: each gate is applied within the parent population from the previous step. 
+Gating is sequential — each gate is applied within the parent population from the previous step. The order here is: all events → remove debris → remove doublets → exclude dead cells → gate population of interest. Every downstream number is a direct consequence of where these gates are drawn.
 
-The order here is: all events → remove debris → remove doublets → gate population of interest. 
+## Scatter gate
 
-Every downstream number in this analysis is a direct consequence of where these gates are drawn.
+Start with FSC-A vs SSC-A to exclude debris and retain intact cells. FSC-A (area) reflects cell size; SSC-A reflects internal complexity. Debris falls at very low FSC; lymphocytes cluster at low-to-mid FSC with low SSC; monocytes and granulocytes sit higher.
 
-**A note on this dataset:** the GvHD data was collected on a conventional FACScan with only height (H) and one area (A) parameter — specifically FL2.A. Modern instruments record FSC-Area and SSC-Area which are the standard channels for singlet discrimination. We'll work with what this dataset provides.
-
-Start with a scatter gate to exclude debris and retain intact leukocytes. Visualize first to understand the data before setting values.
-
-```{r scatter_vis, fig.width=12, fig.height=16, warning=FALSE}
+```{r scatter_vis, fig.width=6, fig.height=5, warning=FALSE}
 df_all <- get_pop_df(gs, "root")
 
-ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
-  geom_hex(bins = 60) +
+ggplot(df_all, aes(x = FSC.A, y = SSC.A)) +
+  geom_hex(bins = 80) +
   scale_fill_viridis_c() +
-  facet_wrap(~sample, ncol = 5) +
-  theme_minimal(base_size = 10) +
-  labs(title = "All events — identify the leukocyte region before setting gate")
+  theme_minimal(base_size = 11) +
+  labs(title = "All events — identify the leukocyte region")
 ```
-
-FSC (forward scatter) reflects cell size — larger cells deflect more light forward. SSC (side scatter) reflects internal complexity — granule-rich cells scatter more light to the side. The major populations separate as follows: debris falls as a diffuse cloud at very low FSC; lymphocytes sit as a compact cluster at low-to-mid FSC and low SSC; monocytes are larger with intermediate SSC; granulocytes are the most granular and sit at high SSC. For a myeloid panel like this one, the gate should include the full leukocyte region — lymphocytes, monocytes, and granulocytes — not just the lymphocyte cluster. Restricting to low SSC would exclude the granulocytes we're interested in.
-
-`rectangleGate()` defines a rectangular region: `c(100, 850)` keeps events where FSC.H is between 100 and 850, `c(0, 900)` keeps everything below SSC.H = 900. Read the axis values off your visualization to decide where your own data's boundaries should fall — they differ by instrument and panel.
 
 ```{r scatter_gate}
 scatter_gate <- rectangleGate(
   filterId = "leukocytes",
-  "FSC.H"  = c(100, 850),
-  "SSC.H"  = c(0, 900)
+  "FSC-A"  = c(50000, 250000),
+  "SSC-A"  = c(0, 150000)
 )
-
 gs_pop_add(gs, scatter_gate, parent = "root")
 recompute(gs)
 ```
 
-```{r scatter_check, fig.width=12, fig.height=16, warning=FALSE}
-ggplot(df_all, aes(x = FSC.H, y = SSC.H)) +
-  geom_hex(bins = 60) +
+```{r scatter_check, fig.width=6, fig.height=5, warning=FALSE}
+ggplot(df_all, aes(x = FSC.A, y = SSC.A)) +
+  geom_hex(bins = 80) +
   scale_fill_viridis_c() +
-  geom_rect(aes(xmin = 100, xmax = 850, ymin = 0, ymax = 900),
+  geom_rect(aes(xmin = 50000, xmax = 250000, ymin = 0, ymax = 150000),
             fill = NA, color = "red", linewidth = 0.8, inherit.aes = FALSE) +
-  facet_wrap(~sample, ncol = 5) +
-  theme_minimal(base_size = 10) +
+  theme_minimal(base_size = 11) +
   labs(title = "Leukocyte gate (red box)")
 ```
 
-For singlet discrimination, modern instruments use FSC-Height vs FSC-Area: single cells fall on a tight diagonal, doublets appear above it. This dataset doesn't have FSC-Area, so we use CD45_PE_H vs CD45_PE_A — the height and area measurements of the CD45 (PE) channel — which captures the same doublet-exclusion principle. On spectral data, use `FSC.A` vs `FSC.H` instead.
+## Singlet gate
 
-```{r singlet_vis, fig.width=12, fig.height=16, warning=FALSE}
-df_lymph <- get_pop_df(gs, "leukocytes")
+Modern instruments record both FSC-Area and FSC-Height. Single cells fall on a tight diagonal (area proportional to height); doublets sit above it because two cells transiting together produce a wider pulse (higher area for a similar peak height).
 
-ggplot(df_lymph, aes(x = CD45_PE_A, y = CD45_PE_H)) +
-  geom_hex(bins = 60) +
+```{r singlet_vis, fig.width=6, fig.height=5, warning=FALSE}
+df_leuko <- get_pop_df(gs, "leukocytes")
+
+ggplot(df_leuko, aes(x = FSC.A, y = FSC.H)) +
+  geom_hex(bins = 80) +
   scale_fill_viridis_c() +
-  facet_wrap(~sample, ncol = 5) +
-  theme_minimal(base_size = 10) +
-  labs(title = "CD45 PE-Area vs PE-Height — singlet population falls along the diagonal")
+  theme_minimal(base_size = 11) +
+  labs(title = "FSC-A vs FSC-H — singlets fall along the diagonal")
 ```
 
 ```{r singlet_gate}
@@ -101,124 +92,109 @@ singlet_gate <- polygonGate(
   filterId = "singlets",
   .gate = matrix(
     c(
-        0,    0,
-        0,  200,
-      460, 2545,
-      691, 2545,
-      691, 2100
+      50000,  50000,
+      50000, 200000,
+     230000, 250000,
+     250000, 180000
     ),
     ncol = 2, byrow = TRUE,
-    dimnames = list(NULL, c("CD45_PE_A", "CD45_PE_H"))
+    dimnames = list(NULL, c("FSC-A", "FSC-H"))
   )
 )
-
 gs_pop_add(gs, singlet_gate, parent = "leukocytes")
 recompute(gs)
 ```
 
-```{r singlet_check, fig.width=12, fig.height=16, warning=FALSE}
+```{r singlet_check, fig.width=6, fig.height=5, warning=FALSE}
 gate_poly <- data.frame(
-  CD45_PE_A = c(0,   0,   460,  691,  691),
-  CD45_PE_H = c(0, 200, 2545, 2545, 2100)
+  FSC.A = c(50000,  50000, 230000, 250000),
+  FSC.H = c(50000, 200000, 250000, 180000)
 )
-
-ggplot(df_lymph, aes(x = CD45_PE_A, y = CD45_PE_H)) +
-  geom_hex(bins = 60) +
+ggplot(df_leuko, aes(x = FSC.A, y = FSC.H)) +
+  geom_hex(bins = 80) +
   scale_fill_viridis_c() +
-  geom_polygon(data = gate_poly, aes(x = CD45_PE_A, y = CD45_PE_H),
+  geom_polygon(data = gate_poly, aes(x = FSC.A, y = FSC.H),
                fill = NA, color = "red", linewidth = 0.8) +
-  facet_wrap(~sample, ncol = 5) +
-  theme_minimal(base_size = 10) +
-  labs(title = "Singlet gate — polygon following the single-cell diagonal")
+  theme_minimal(base_size = 11) +
+  labs(title = "Singlet gate")
 ```
 
-> **Automatic singlet gating:** The `flowStats` package provides `singletGate()`, which fits the gate to the data rather than requiring you to set vertices manually. It finds the singlet diagonal automatically and returns a `polygonGate` you can add directly to the GatingSet:
-> ```r
-> library(flowStats)
-> # Fit to a representative sample, then apply to all
-> ff <- gh_pop_get_data(gs[[1]], "leukocytes")
-> sg <- singletGate(ff, area = "CD45_PE_A", height = "CD45_PE_H")
-> gs_pop_add(gs, sg, parent = "leukocytes")
-> recompute(gs)
-> ```
-> This is particularly useful when gating many samples where the singlet population shifts between runs, or when you want a fully reproducible gate that doesn't rely on manually chosen coordinates.
+> **Automatic singlet gating:** `flowStats::singletGate()` fits the diagonal automatically from the data, avoiding manual vertex selection.
 
-The GvHD panel doesn't include a viability dye. In a real experiment you would gate out dead cells here using a viability dye channel.  Dead cells stain brightly, live cells are dim or negative. Since we can't demonstrate this with the GvHD data, we proceed directly to the population gate.
+## Live cell gate
 
-> For spectral data, add a live/dead gate after singlets:
-> ```r
-> live_gate <- rectangleGate(filterId = "live", "V525.A" = c(-Inf, 2))
-> gs_pop_add(gs, live_gate, parent = "singlets")
-> recompute(gs)
-> ```
+The viability dye (PO_DCM) enters dead cells and stains them brightly. Live cells are dim or negative. Gate on `Viability` low to retain only live cells:
 
-## Choosing channels for your population gate
-
-The channels you plot and gate on should correspond to the markers that define your population of interest. There is no universal answer — it depends entirely on your panel design.
-
-**Start from biology, not from the data.** Before looking at any plots, you should already know which markers your population expresses and which fluorochrome those markers were conjugated to. If you are gating CD8+ T cells, you need the channel your CD8 antibody is on. Looking at plots first and drawing gates around whatever cluster looks interesting is not a sound approach.
-
-**Use markers that clearly separate your population.** The best gate is one where your population forms a distinct cluster with visible empty space between it and everything else. If your population falls in the middle of a continuous smear on a given channel, any gate boundary you draw there will be arbitrary.
-
-**Check consistency across samples.** Scan all samples after setting values to confirm the gate captures the same population in each one. If the population shifts between samples due to staining variability, tissue differences, or batch effects, a fixed gate will be systematically wrong for some of them.
-
-**Back-gate to verify.** After gating, plot the gated population back onto FSC vs SSC. If those cells don't fall where you'd expect that cell type to sit, the gate is probably capturing the wrong thing.
-
-In this tutorial we gate on CD15+ granulocytes. CD15 has a clearly bimodal distribution in this dataset — about 75% of singlet events are CD15-negative (dim/absent) and 25% are strongly CD15-positive (granulocytes). A 1D histogram gate is more appropriate than a 2D scatter here because the separation is driven entirely by one marker, and a histogram makes the valley between the two populations immediately visible.
-
-In your own experiment, if two markers are both discriminatory (e.g., CD8 vs CD4 for T cell subsets), a 2D scatter gate is usually better — it uses both axes to separate populations. When one marker does all the work, a histogram is cleaner and the threshold is easier to justify.
-
-```{r population_vis, fig.width=12, fig.height=16, warning=FALSE}
+```{r live_vis, fig.width=6, fig.height=4, warning=FALSE}
 df_sing <- get_pop_df(gs, "singlets")
 
-ggplot(df_sing, aes(x = CD15_FITC_H)) +
-  geom_density(fill = "steelblue", alpha = 0.4) +
+ggplot(df_sing, aes(x = Viability)) +
+  geom_density(fill = "steelblue", alpha = 0.5) +
   scale_x_log10() +
-  facet_wrap(~sample, ncol = 5) +
-  theme_minimal(base_size = 10) +
-  labs(title = "CD15 (FITC) — CD15+ granulocytes visible as the right-hand peak",
-       x = "CD15_FITC_H (log scale)", y = "Density")
+  geom_vline(xintercept = 0.5, color = "red", linetype = "dashed") +
+  theme_minimal(base_size = 11) +
+  labs(title = "Viability dye — live cells are dim (left), dead cells bright (right)")
 ```
 
-The data is hardware-log amplified: the stored values 1–10000 represent 4 decades of true fluorescence. On a linear x-axis, negative cells (stored values ~1–17) compress into an invisible spike near zero. `scale_x_log10()` spreads the axis out to show both peaks — this is how FlowJo and other flow software display this type of data, and it is the standard way to look at it.
-
-The valley between the two peaks falls around x = 500–1000. We set the threshold at 1000.
-
-```{r population_gate}
-population_gate <- rectangleGate(
-  filterId      = "population_of_interest",
-  "CD15_FITC_H" = c(1000, Inf)
+```{r live_gate}
+live_gate <- rectangleGate(
+  filterId  = "live",
+  "Viability" = c(-Inf, 0.5)
 )
-
-gs_pop_add(gs, population_gate, parent = "singlets")
+gs_pop_add(gs, live_gate, parent = "singlets")
 recompute(gs)
 ```
 
-```{r population_check, fig.width=12, fig.height=16, warning=FALSE}
-ggplot(df_sing, aes(x = CD15_FITC_H)) +
-  geom_density(fill = "steelblue", alpha = 0.4) +
-  geom_vline(xintercept = 1000, color = "red", linetype = "dashed", linewidth = 0.8) +
-  scale_x_log10() +
-  facet_wrap(~sample, ncol = 5) +
-  theme_minimal(base_size = 10) +
-  labs(title = "CD15+ gate threshold (red dashed line)",
-       x = "CD15_FITC_H (log scale)", y = "Density")
+## Choosing channels for your population gate
+
+The channels you gate on should correspond to the markers that define your population of interest. There is no universal answer — it depends entirely on your panel design.
+
+**Start from biology, not from the data.** Before looking at any plots, you should already know which markers your population expresses. If you are gating CD8+ T cells, you need the channel your CD8 antibody is on. Looking at plots first and drawing gates around whatever cluster looks interesting is not a sound approach.
+
+**Use markers that clearly separate your population.** The best gate is one where your population forms a distinct cluster with visible empty space between it and everything else.
+
+**Check consistency across samples.** In a multi-sample experiment, scan all samples after setting values to confirm the gate captures the same population in each one. If the population shifts between samples due to staining variability, tissue differences, or batch effects, a fixed gate will be systematically wrong for some of them.
+
+**Back-gate to verify.** After gating, plot the gated population back onto FSC vs SSC. If those cells don't fall where you'd expect that cell type to sit, the gate is probably capturing the wrong thing.
+
+## T cell gate
+
+CD3 marks all T cells. Its density plot after transformation should show a clear bimodal distribution: CD3-negative cells (B cells, monocytes, NK cells) and CD3-positive T cells.
+
+```{r tcell_vis, fig.width=6, fig.height=4, warning=FALSE}
+df_live <- get_pop_df(gs, "live")
+
+ggplot(df_live, aes(x = CD3_PB)) +
+  geom_density(fill = "steelblue", alpha = 0.5) +
+  geom_vline(xintercept = 1.5, color = "red", linetype = "dashed") +
+  theme_minimal(base_size = 11) +
+  labs(title = "CD3 — T cells are the right-hand peak",
+       x = "CD3_PB (arcsinh)", y = "Density")
 ```
 
-Check the cell counts at each gate across all samples. Large drops between steps are worth investigating.
+```{r tcell_gate}
+tcell_gate <- rectangleGate(
+  filterId  = "T_cells",
+  "CD3_PB"  = c(1.5, Inf)
+)
+gs_pop_add(gs, tcell_gate, parent = "live")
+recompute(gs)
+```
 
 ```{r gate_stats}
 gs_pop_get_stats(gs, nodes = gs_get_pop_paths(gs), type = "count")
 ```
 
+Large drops between steps are worth investigating. A very small live cell count relative to singlets can indicate a sample quality issue; a very small T cell count may reflect biology (immunosuppressed patient) or a staining problem.
+
 ```{r save}
-unlink("data/processed/GvHD_tcell_gs", recursive = TRUE)
-save_gs(gs, path = "data/processed/GvHD_tcell_gs")
+unlink("data/processed/PBMC_gs_gated", recursive = TRUE)
+save_gs(gs, path = "data/processed/PBMC_gs_gated")
 cat("Gated GatingSet saved\n")
 ```
 
 <hr>
 <div style="display:flex; gap:8px; margin-top:1.5em;">
-<a href="03_transformation.html" class="btn btn-default btn-sm">← Prev: Transformation</a>
+<a href="03_transformation.html" class="btn btn-default btn-sm">← Prev: Unmixing & Transformation</a>
 <a href="05_dimensionality_reduction.html" class="btn btn-primary btn-sm">Next: Dimensionality Reduction →</a>
 </div>

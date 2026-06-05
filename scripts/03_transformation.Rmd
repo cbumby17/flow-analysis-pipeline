@@ -1,5 +1,5 @@
 ---
-title: "03: Transformation"
+title: "03: Spectral Unmixing and Transformation"
 output:
   html_document:
     theme: cosmo
@@ -19,69 +19,133 @@ output:
 ```{r libraries, message=FALSE, warning=FALSE}
 library(flowCore)
 library(flowWorkspace)
-library(ggcyto)
+library(flowSpecs)
 library(tidyverse)
 ```
 
 ```{r load, message=FALSE}
-gs <- load_gs("data/processed/GvHD_gs_qc")
+ff_raw <- readRDS("data/processed/PBMC_ff_qc.rds")
+data(specMat)
 ```
 
 ## Why transformation is necessary
 
-Raw flow cytometry data has two properties that make it difficult to work with directly:
+Raw spectral flow data has two properties that make it difficult to work with directly:
 
 1. **The range is enormous.** Highly expressed markers can have 100× more signal than dimly expressed ones. On a linear scale, dim populations collapse into an unresolvable cluster near zero.
-2. **Negative values exist.** After compensation or spectral unmixing, cells with no true expression of a marker can have slightly negative values due to detector noise. Standard log transformation breaks on negatives.
+2. **Negative values exist.** After spectral unmixing, cells with no true expression of a marker can have slightly negative values due to spectral spillover and detector noise. Standard log transformation breaks on negatives.
 
-Two transformations address both problems. Which one you use depends on how your data was collected:
+**Arcsinh** is the standard transformation for spectral flow. The `b` parameter (`b = 1/cofactor`) controls the linear-to-log transition. Apply it only to fluorochrome channels — scatter parameters (FSC, SSC) are already on a meaningful linear scale.
 
-**Logicle (biexponential)** — the standard for conventional flow cytometry. Linear near zero (handles negatives gracefully) and logarithmic at high values. See Parks et al., 2006 in *Cytometry A*.
-
-**Arcsinh** — the standard for mass cytometry (CyTOF) and modern spectral flow. The `b` parameter controls the linear-to-log transition (`b = 1/cofactor`; cofactor 150 is standard for flow cytometry). Apply only to fluorochrome channels: scatter parameters (FSC, SSC) are already on a meaningful linear scale and should not be transformed. See Bendall et al., 2011 in *Science*.
-
-The GvHD dataset was collected on a conventional cytometer with hardware log amplifiers, which means the transformation was applied before the signal was even digitized. This makes the `$PnE` check especially important here.
-
-## Checking `$PnE` before transforming
+## Checking `$PnE`
 
 Run this on every new dataset before doing anything else:
 
 ```{r check_pne}
-keyword(gs_pop_get_data(gs, "root")[[1]], paste0("$P", 1:7, "E"))
+keyword(ff_raw, paste0("$P", 1:6, "E"))
 ```
 
-The scatter channels (FSC.H, SSC.H) are `"0,0"` — untransformed linear values, as expected. The fluorescence channels (CD15_FITC_H, CD45_PE_H, CD14_PerCP_H, CD33_APC_H) are `"4,0"`, which means a log transformation was already applied in hardware before the signal was digitized. **Applying another transformation on top would be wrong.**
+All channels are `"0,0"` — untransformed linear values. This is the expected result for Aurora data and confirms we need to apply transformation ourselves. If you see anything other than `"0,0"` for fluorescence channels, a transformation was already applied at export and applying another would be wrong.
 
-On a modern instrument like the Cytek Aurora, fluorescence channels are stored as linear values (`$PnE = "0,0"`) and you apply the transformation yourself in R. On older conventional cytometers with analog electronics, the log transformation happens before digitization and arrives baked into the file. The `"4,0"` value tells you the data is on a 4-decade log scale:
+## Spectral unmixing
 
-$$x = \frac{R}{f_1} \log_{10}(y)$$
+Before we can transform fluorochrome channels, we need to create them. Right now the data is organised by detector (V1-A, B1-A, R1-A, etc.). Spectral unmixing decomposes each cell's full detector spectrum into per-fluorochrome contributions using the known spectral signature of each fluorochrome.
 
-where $x$ is the stored channel value, $y$ is the original signal, $R$ is the channel range, and $f_1 = 4$ is the number of log decades.
+In most labs this step happens in SpectroFlo, which exports unmixed FCS files for loading into R. Here we demonstrate it in R using `specUnmix()` from the `flowSpecs` package and a pre-computed unmixing matrix.
 
-Since this data is pre-transformed, we skip straight to visualization.
-
-```{r visualize, fig.width=12, fig.height=6, warning=FALSE, message=FALSE}
-ggcyto(gs[1:6], aes(x = "CD15_FITC_H", y = "CD45_PE_H"), subset = "root") +
-  geom_hex(bins = 50) +
-  facet_wrap(~name) +
-  labs(title = "CD15 (FITC) vs CD45 (PE) — log-amplified, no additional transformation needed")
+```{r show_specmat}
+cat("Fluorochromes:", rownames(specMat), "\n")
+cat("Detector channels:", ncol(specMat), "\n")
 ```
 
-The GatingSet loaded from script 02 is passed through as-is — no transformation applied for this dataset. For Aurora data, you would apply arcsinh to the flowSet before this point and the transformed data would be carried forward here.
+Apply the unmixing matrix to the QC-cleaned data:
+
+```{r unmix, message=FALSE, warning=FALSE}
+ff_unmixed <- specUnmix(ff_raw, specMat)
+colnames(ff_unmixed)
+```
+
+The 42 detector channels have been replaced by 13 fluorochrome channels plus scatter. Rename them to put the marker first:
+
+```{r rename_channels}
+channel_map <- c(
+  "AF647_IgM"    = "IgM_AF647",
+  "AF700_CD4"    = "CD4_AF700",
+  "APCCy7_CD19"  = "CD19_APCCy7",
+  "BV605_CD14"   = "CD14_BV605",
+  "BV650_CD56"   = "CD56_BV650",
+  "BV711_CD11c"  = "CD11c_BV711",
+  "BV785_CD8a"   = "CD8a_BV785",
+  "FITC_CD41b"   = "CD41b_FITC",
+  "PB_CD3"       = "CD3_PB",
+  "PE_X"         = "PE_X",
+  "PECy7_CD45RA" = "CD45RA_PECy7",
+  "PO_DCM"       = "Viability",
+  "Autofluo"     = "Autofluo"
+)
+cn <- colnames(ff_unmixed)
+colnames(ff_unmixed) <- ifelse(cn %in% names(channel_map), channel_map[cn], cn)
+colnames(ff_unmixed)
+```
+
+> **On your own SpectroFlo-unmixed data:** Your FCS files already have fluorochrome channels — skip `specUnmix()` entirely. Just rename channels from fluorochrome notation (e.g., `BV421-A`) to marker notation (e.g., `CD3_BV421`) using the same approach.
+
+## Arcsinh transformation
+
+Check the raw value ranges to confirm that negative values are present and transformation is needed:
+
+```{r check_negatives}
+fluor_channels <- c("CD3_PB", "CD4_AF700", "CD8a_BV785",
+                    "CD14_BV605", "CD19_APCCy7", "CD56_BV650")
+
+for (ch in fluor_channels) {
+  vals <- exprs(ff_unmixed)[, ch]
+  cat(ch, ": range", round(range(vals), 0),
+      "| negatives:", sum(vals < 0), "\n")
+}
+```
+
+There are substantial negative values from spectral unmixing. A cofactor of 3000 is appropriate for this dataset's value range — it places the linear-to-log transition where the negative lobe and positive populations are both visible. Apply arcsinh to all fluorochrome channels but not scatter or Time:
+
+```{r transform}
+fluor_all  <- setdiff(colnames(ff_unmixed),
+                      c("Time", "SSC.H", "SSC.A", "FSC.H", "FSC.A"))
+asinhTrans <- arcsinhTransform(transformationId = "arcsinh", a = 0, b = 1/3000, c = 0)
+transList  <- transformList(fluor_all, asinhTrans)
+ff_transformed <- transform(ff_unmixed, transList)
+```
+
+Visualise the effect — both the negative lobe (cells not expressing the marker) and a positive population should now be visible for markers like CD3 and CD4:
+
+```{r vis_transform, fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
+before <- as.data.frame(exprs(ff_unmixed)[, fluor_channels]) %>%
+  pivot_longer(everything(), names_to = "channel", values_to = "value") %>%
+  mutate(stage = "Before")
+
+after <- as.data.frame(exprs(ff_transformed)[, fluor_channels]) %>%
+  pivot_longer(everything(), names_to = "channel", values_to = "value") %>%
+  mutate(stage = "After arcsinh")
+
+bind_rows(before, after) %>%
+  mutate(stage = factor(stage, levels = c("Before", "After arcsinh"))) %>%
+  ggplot(aes(x = value)) +
+  geom_density(fill = "steelblue", alpha = 0.5) +
+  facet_grid(stage ~ channel, scales = "free") +
+  theme_minimal(base_size = 9) +
+  labs(title = "Arcsinh transformation — before and after", x = NULL, y = "Density")
+```
+
+## Save
 
 ```{r save}
-unlink("data/processed/GvHD_tcell_gs_base", recursive = TRUE)
-save_gs(gs, path = "data/processed/GvHD_tcell_gs_base")
-cat("GatingSet saved to data/processed/GvHD_tcell_gs_base\n")
+fs_transformed <- flowSet(list(PBMC = ff_transformed))
+gs_out <- GatingSet(fs_transformed)
+unlink("data/processed/PBMC_gs_transformed", recursive = TRUE)
+save_gs(gs_out, path = "data/processed/PBMC_gs_transformed")
+cat("Transformed GatingSet saved\n")
 ```
 
-> For spectral data: load the QC-cleaned flowSet, verify `$PnE = "0,0"` for all fluorochrome channels, then apply arcsinh with cofactor 150:
-> ```r
-> fluor_channels <- c("B515.A", "V525.A", ...)  # your panel's channels
-> asinhTrans <- arcsinhTransform(transformationId = "arcsinh", a = 0, b = 1/150, c = 0)
-> transList <- transformList(fluor_channels, asinhTrans)
-> fs_transformed <- transform(fs, transList)
-> ```
+> **Cofactor for your own Aurora data:** The standard cofactor for SpectroFlo-unmixed spectral flow data is 150, not 3000. The difference is because SpectroFlo exports on a different numerical scale than R-based unmixing. Always check the range of your unmixed values and adjust the cofactor accordingly — too low and the negative lobe is over-compressed, too high and positive populations smear together.
 
 <hr>
 <div style="display:flex; gap:8px; margin-top:1.5em;">

@@ -11,92 +11,81 @@ output:
 
 <div style="display:flex; gap:8px; margin-bottom:1.5em;">
 <a href="01_load_and_metadata.html" class="btn btn-default btn-sm">← Prev: Load Data</a>
-<a href="03_transformation.html" class="btn btn-primary btn-sm">Next: Transformation →</a>
+<a href="03_transformation.html" class="btn btn-primary btn-sm">Next: Unmixing & Transformation →</a>
 </div>
 
 ---
 
 ```{r libraries, message=FALSE, warning=FALSE}
 library(flowCore)
+library(flowSpecs)
 library(flowWorkspace)
 library(PeacoQC)
 library(tidyverse)
 ```
 
 ```{r load, message=FALSE}
-data(GvHD)
-colnames(GvHD) <- make.names(colnames(GvHD))
-
-# Rename channels from hardware detector names to marker_fluorochrome names.
-# Do this once here so all downstream scripts use biologically meaningful names.
-# GvHD panel: CD15-FITC (granulocytes), CD45-PE (pan-leukocyte),
-#             CD14-PerCP (monocytes), CD33-APC (myeloid)
-channel_map <- c(
-  "FL1.H" = "CD15_FITC_H",
-  "FL2.H" = "CD45_PE_H",
-  "FL3.H" = "CD14_PerCP_H",
-  "FL2.A" = "CD45_PE_A",
-  "FL4.H" = "CD33_APC_H"
-)
-cn <- colnames(GvHD)
-colnames(GvHD) <- ifelse(cn %in% names(channel_map), channel_map[cn], cn)
-
-meta <- pData(GvHD)
-meta$patient_id     <- as.character(meta$Patient)
-meta$treatment      <- ifelse(meta$Grade == 1, "Grade 1 (mild)", "Grade 3 (severe)")
-meta$timepoint_days <- meta$Days
-pData(GvHD) <- meta
-fs <- GvHD
+data(fullPanel)
+fs <- flowSet(list(PBMC = fullPanel))
+ff <- fs[[1]]
 ```
 
-Before transforming or gating anything, we check for acquisition problems. The two main things to look for are signal instability over time (caused by clogging or fluidics issues mid-run) and margin events (events where the signal hit the detector ceiling and the true value is unknown).
+QC is performed on the raw spectral data, before unmixing. We are checking whether the instrument itself behaved consistently during acquisition — not whether the biology looks correct. The two main things to check are signal instability over time and margin events.
 
-Plotting signal against time is the fastest way to spot a run that went wrong. A healthy acquisition looks flat. A sudden spike, gradual drift, or a section of flat line followed by a jump usually means something happened to the flow rate.
+## Signal stability over time
 
-```{r time_plots, fig.width=12, fig.height=16, warning=FALSE, message=FALSE}
-time_data <- fsApply(fs, function(ff) {
-  data.frame(
-    Time  = exprs(ff)[, "Time"],
-    CD15_FITC_H = exprs(ff)[, "CD15_FITC_H"],
-    sample = identifier(ff)
-  )
-}, simplify = FALSE)
-time_df <- do.call(rbind, time_data)
+Plot signal in a representative detector from each laser against acquisition time. A healthy run is flat. A sudden spike, drift, or flat section followed by a jump usually means something happened to the flow rate.
 
-ggplot(time_df, aes(x = Time, y = CD15_FITC_H)) +
-  geom_hex(bins = 40) +
-  facet_wrap(~sample, ncol = 5) +
+```{r time_plots, fig.width=10, fig.height=4, warning=FALSE, message=FALSE}
+df_time <- as.data.frame(exprs(ff))
+
+df_long <- df_time[, c("Time", "V8-A", "B8-A", "R5-A")] %>%
+  pivot_longer(-Time, names_to = "channel", values_to = "signal")
+
+ggplot(df_long, aes(x = Time, y = signal)) +
+  geom_hex(bins = 50) +
   scale_fill_viridis_c() +
-  labs(title = "Signal stability over time — CD15 (FITC) channel",
-       x = "Time", y = "CD15_FITC_H") +
-  theme_minimal(base_size = 10)
+  facet_wrap(~channel, scales = "free_y", ncol = 3) +
+  theme_minimal(base_size = 11) +
+  labs(title = "Signal stability — one representative detector per laser",
+       x = "Time", y = "Signal")
 ```
 
-PeacoQC automates this detection. It identifies and removes anomalous events based on signal consistency over time. We run it on each sample and collect the cleaned frames.
+> **Note:** Channel names retain their original dashes when accessed via `exprs()`. Use backtick-quoting (`` `V8-A` ``) or rename with `make.names()` if you need to reference them as data frame columns without quotes.
 
-> **Spectral flow note:** On spectral data, run PeacoQC on a representative subset of unmixed channels rather than all of them. A channel with very few positive cells can produce noisy signal that PeacoQC flags as instability when it isn't. Choose channels that have enough positive events across most samples.
+> **Spectral flow note:** On a 3-laser Aurora you have 42 detector channels. Pick 1–2 representative channels per laser rather than plotting all of them. If one representative channel looks clean the others on the same laser generally will too.
+
+PeacoQC automates this detection across a subset of detectors from each laser.
 
 ```{r peaco_qc, message=FALSE, warning=FALSE, results='hide'}
 dir.create("output/qc", recursive = TRUE, showWarnings = FALSE)
 
-fluor_channels <- c("CD15_FITC_H", "CD45_PE_H", "CD14_PerCP_H", "CD33_APC_H")
+detector_channels <- c(
+  paste0("V", c(4, 8, 12), "-A"),
+  paste0("B", c(4, 8, 12), "-A"),
+  paste0("R", c(2, 5,  8), "-A")
+)
 
-fs_qc <- fsApply(fs, function(ff) {
-  result <- PeacoQC(
-    ff               = ff,
-    channels         = fluor_channels,
-    output_directory = "output/qc",
-    name             = identifier(ff),
-    plot             = FALSE,
-    save_fcs         = FALSE
-  )
-  result$FinalFF
-})
+result <- PeacoQC(
+  ff               = ff,
+  channels         = detector_channels,
+  output_directory = "output/qc",
+  name             = "PBMC",
+  plot             = FALSE,
+  save_fcs         = FALSE
+)
+ff_qc <- result$FinalFF
 ```
 
-After running PeacoQC, check how many events were removed from each sample. Losing a small fraction is expected — anything over 20% is worth investigating further.
+```{r qc_summary}
+cat("Events before PeacoQC:", nrow(ff), "\n")
+cat("Events after PeacoQC: ", nrow(ff_qc), "\n")
+cat("Retained:             ", round(100 * nrow(ff_qc) / nrow(ff), 1), "%\n")
+```
 
-If a sample exceeds that threshold, go back to the time plots and look at *where* the instability occurred. A brief blip at the very start of acquisition is common and less concerning as the flow rate often takes a moment to stabilise as the sample first enters the system. However, instability spread throughout the run is more serious.
+Losing a small fraction is expected. Anything over 20% is worth going back to look at the time plots.
+
+If a sample exceeds that threshold, go back to the time plots and look at *where* the instability occurred. A blip at the very start is common and less concerning — the flow rate often takes a moment to stabilise. Instability spread throughout the run is more serious.
 
 Also check whether the remaining cell count is still adequate. Losing 25% of 100,000 events is generally fine; losing 25% of 3,000 may leave you with too few cells for reliable gating and statistics.
 
@@ -105,19 +94,9 @@ Also check whether the remaining cell count is still adequate. Losing 25% of 100
 
 The most important principle is that exclusion decisions must be made and documented before looking at your results, regardless of what you choose to do.
 
-```{r qc_summary}
-events_before <- as.integer(fsApply(fs, nrow))
-events_after  <- as.integer(fsApply(fs_qc, nrow))
+## Margin events
 
-data.frame(
-  sample       = sampleNames(fs),
-  before       = events_before,
-  after        = events_after,
-  pct_retained = round(events_after / events_before * 100, 1)
-)
-```
-
-Margin events are events where the detector recorded a value at the maximum of its range, meaning the true signal was even higher and got clipped. As a result, we remove them because the actual value is unknown. This is distinct from what PeacoQC catches; PeacoQC looks at temporal instability, not ceiling effects.
+Margin events are where a detector recorded the maximum of its range — the true signal was even higher and got clipped. The actual value is unknown, so we remove them. This is distinct from what PeacoQC catches; PeacoQC looks at temporal instability, not ceiling effects.
 
 ```{r margin_events}
 remove_margin_events <- function(ff) {
@@ -129,30 +108,21 @@ remove_margin_events <- function(ff) {
   ff[!at_ceiling, ]
 }
 
-fs_clean <- fsApply(fs_qc, remove_margin_events)
+ff_clean <- remove_margin_events(ff_qc)
+cat("Events after margin removal:", nrow(ff_clean), "\n")
+cat("Total retained:             ", round(100 * nrow(ff_clean) / nrow(ff), 1), "%\n")
 ```
 
-```{r qc_report}
-data.frame(
-  sample          = sampleNames(fs_clean),
-  final_events    = as.integer(fsApply(fs_clean, nrow)),
-  pct_of_original = round(as.integer(fsApply(fs_clean, nrow)) /
-                          as.integer(fsApply(fs, nrow)) * 100, 1)
-)
-```
-
-We convert the QC-cleaned flowSet to a GatingSet, which is the standard persistence format in the `flowWorkspace` ecosystem. All downstream scripts load from this. Even with no gates applied yet, `save_gs()` correctly serializes the data and metadata.
+## Save
 
 ```{r save}
 dir.create("data/processed", recursive = TRUE, showWarnings = FALSE)
-gs <- GatingSet(fs_clean)
-unlink("data/processed/GvHD_gs_qc", recursive = TRUE)
-save_gs(gs, path = "data/processed/GvHD_gs_qc")
-cat("QC-cleaned GatingSet saved to data/processed/GvHD_gs_qc\n")
+saveRDS(ff_clean, "data/processed/PBMC_ff_qc.rds")
+cat("QC flowFrame saved\n")
 ```
 
 <hr>
 <div style="display:flex; gap:8px; margin-top:1.5em;">
 <a href="01_load_and_metadata.html" class="btn btn-default btn-sm">← Prev: Load Data</a>
-<a href="03_transformation.html" class="btn btn-primary btn-sm">Next: Transformation →</a>
+<a href="03_transformation.html" class="btn btn-primary btn-sm">Next: Unmixing & Transformation →</a>
 </div>

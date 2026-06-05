@@ -24,90 +24,71 @@ library(tidyverse)
 ```
 
 ```{r load}
-gs <- load_gs("data/processed/GvHD_tcell_gs")
+gs <- load_gs("data/processed/PBMC_gs_gated")
 ```
 
-UMAP takes all your fluorochrome channels and compresses them into two dimensions, letting you visualize the overall structure of your data — which populations exist, how distinct they are, and whether samples cluster by treatment or by something unexpected (like batch or operator). This is an exploratory step, not an analytical one. What you see here should guide interpretation, not replace gating or statistics.
+UMAP takes all your marker channels and compresses them into two dimensions, letting you visualise the overall structure of your data — which populations exist, how distinct they are, and how they relate to each other. For a PBMC panel with T cells, B cells, NK cells, and monocytes, each population should appear as a distinct cluster. This is an exploratory step, not an analytical one: what you see here should guide interpretation, not replace gating or statistics.
 
-We run UMAP on the singlet-gated cells and subsample before running — UMAP doesn't need every cell to find the structure, and running it on very large datasets is slow with minimal benefit.
+## Extract expression data
 
-```{r extract_expression}
-fluor_channels <- c("CD15_FITC_H", "CD45_PE_H", "CD14_PerCP_H", "CD33_APC_H")
+Run UMAP on the live singlet population — all immune cells before restricting to T cells only:
 
-singlet_data <- gs_pop_get_data(gs, "singlets")
+```{r extract}
+marker_channels <- c("CD3_PB", "CD4_AF700", "CD8a_BV785",
+                     "CD14_BV605", "CD19_APCCy7", "CD56_BV650",
+                     "CD11c_BV711", "CD45RA_PECy7", "IgM_AF647")
 
-expr_list <- fsApply(singlet_data, function(ff) {
-  as.data.frame(exprs(ff)[, fluor_channels]) %>%
-    mutate(sample = identifier(ff))
-}, simplify = FALSE)
-
-expr_df <- bind_rows(expr_list)
+live_data <- gs_pop_get_data(gs, "live")
+expr_df   <- as.data.frame(exprs(live_data[[1]])[, marker_channels])
+cat("Cells for UMAP:", nrow(expr_df), "\n")
 ```
 
-```{r subsample}
-set.seed(42)
-n_per_sample <- 500  # small dataset so this keeps it fast
-
-expr_sub <- expr_df %>%
-  group_by(sample) %>%
-  slice_sample(n = n_per_sample) %>%
-  ungroup()
-```
+## Run UMAP
 
 ```{r run_umap, message=FALSE}
+set.seed(42)
 umap_coords <- umap(
-  expr_sub[, fluor_channels],
+  expr_df,
   n_neighbors = 15,
   min_dist    = 0.3,
   n_threads   = 4,
   verbose     = FALSE
 )
 
-umap_df <- expr_sub %>%
-  mutate(UMAP1 = umap_coords[, 1], UMAP2 = umap_coords[, 2])
+umap_df <- expr_df %>%
+  mutate(UMAP1 = umap_coords[, 1],
+         UMAP2 = umap_coords[, 2])
 ```
 
-Plot colored by each marker to understand what's driving the structure. Regions with high expression of a marker should correspond to populations you'd recognize from gating.
+## Marker plots
 
-```{r marker_plots, fig.width=10, fig.height=8, warning=FALSE}
+Colour the UMAP by each marker to understand what drives the structure. Regions with high expression of a marker should correspond to the populations you know those markers define.
+
+```{r marker_plots, fig.width=12, fig.height=8, warning=FALSE}
 plot_marker <- function(df, channel) {
   ggplot(df, aes(x = UMAP1, y = UMAP2, color = .data[[channel]])) +
-    geom_point(size = 0.5, alpha = 0.6) +
+    geom_point(size = 0.4, alpha = 0.6) +
     scale_color_viridis_c() +
     labs(title = channel) +
-    theme_minimal() +
-    theme(legend.position = "right")
+    theme_minimal(base_size = 10) +
+    theme(legend.position = "right",
+          axis.text = element_blank(),
+          axis.ticks = element_blank())
 }
 
-p1 <- plot_marker(umap_df, "CD15_FITC_H")
-p2 <- plot_marker(umap_df, "CD45_PE_H")
-p3 <- plot_marker(umap_df, "CD14_PerCP_H")
-p4 <- plot_marker(umap_df, "CD33_APC_H")
-
-gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+plots <- lapply(marker_channels, function(ch) plot_marker(umap_df, ch))
+gridExtra::grid.arrange(grobs = plots, ncol = 3)
 ```
 
-Also plot colored by metadata to check whether samples are mixing properly or separating by something unexpected. Samples from the same treatment group should largely overlap. A clear separation by patient or visit rather than by disease grade could indicate a batch effect worth investigating before statistics.
-
-```{r metadata_plots, fig.width=10, fig.height=4, warning=FALSE, message=FALSE}
-meta <- pData(gs) %>% rownames_to_column("sample")
-umap_df <- left_join(umap_df, meta, by = "sample")
-
-p_treatment <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = treatment)) +
-  geom_point(size = 0.5, alpha = 0.5) +
-  theme_minimal() +
-  labs(title = "Colored by treatment")
-
-p_patient <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = patient_id)) +
-  geom_point(size = 0.5, alpha = 0.5) +
-  theme_minimal() +
-  labs(title = "Colored by patient — check for patient-level batch effects")
-
-gridExtra::grid.arrange(p_treatment, p_patient, ncol = 2)
-```
+Interpreting the UMAP:
+- **CD3-bright cluster** → T cells
+- **CD19-bright / IgM-bright region** → B cells
+- **CD56-bright region** → NK cells
+- **CD14-bright / CD11c-bright region** → monocytes and dendritic cells
+- **Within the T cell cluster:** CD4 and CD8 should occupy distinct sub-regions, with CD45RA marking naive and terminally differentiated effector subsets
 
 ```{r save}
-saveRDS(umap_df, "data/processed/GvHD_tcell_umap.rds")
+saveRDS(umap_df, "data/processed/PBMC_umap.rds")
 ```
 
 <hr>
