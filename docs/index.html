@@ -1500,14 +1500,10 @@ border-radius: 0px;
 </div>
 
 
-<p>A step-by-step tutorial for analyzing flow cytometry data in R, built
-around the Cytek Aurora spectral flow cytometer. The pipeline covers
-everything from loading FCS files through statistical analysis.</p>
-<p>The example data used throughout is the GvHD dataset from the
-<code>flowCore</code> package. This data originates from a longitudinal
-study of bone marrow transplant patients done on a conventional flow
-cytometer, so a few steps differ from spectral data (notably the
-transformation step). Differences are clearly noted in each script.</p>
+<p>A step-by-step tutorial for analyzing spectral flow cytometry data in
+R. The pipeline covers the full workflow from raw spectral FCS files
+through statistical analysis, using real PBMC data from the
+<code>flowSpecs</code> Bioconductor package — no files to download.</p>
 <hr />
 <div id="tutorial-scripts" class="section level2">
 <h2>Tutorial scripts</h2>
@@ -1534,13 +1530,14 @@ loading and attaching metadata</td>
 <td>Temporal instability, margin events, PeacoQC</td>
 </tr>
 <tr class="odd">
-<td><a href="scripts/03_transformation.html">03: Transformation</a></td>
-<td>Checking <code>$PnE</code>, transformed vs. untransformed data</td>
+<td><a href="scripts/03_transformation.html">03: Spectral Unmixing &amp;
+Transformation</a></td>
+<td>Checking <code>$PnE</code>, spectral unmixing in R, arcsinh
+transformation</td>
 </tr>
 <tr class="even">
 <td><a href="scripts/04_gating.html">04: Gating</a></td>
-<td>Sequential manual gating: scatter, singlets, populations of
-interest</td>
+<td>Sequential manual gating: scatter, singlets, live/dead, T cells</td>
 </tr>
 <tr class="odd">
 <td><a href="scripts/05_dimensionality_reduction.html">05:
@@ -1561,15 +1558,15 @@ Dimensionality Reduction</a></td>
 </div>
 <div id="setup" class="section level2">
 <h2>Setup</h2>
-<p>Install the required packages. The example data (<code>GvHD</code>)
-is built into the <code>flowCore</code> package and loads with a single
-line in script 01 so there are no files to download.</p>
+<p>Install the required packages. The example data is built into the
+<code>flowSpecs</code> Bioconductor package — no files to download.</p>
 <pre class="r"><code># CRAN
 install.packages(c(&quot;tidyverse&quot;, &quot;uwot&quot;, &quot;lme4&quot;, &quot;emmeans&quot;, &quot;gridExtra&quot;))
 
 # Bioconductor
 if (!requireNamespace(&quot;BiocManager&quot;, quietly = TRUE)) install.packages(&quot;BiocManager&quot;)
-BiocManager::install(c(&quot;flowCore&quot;, &quot;flowWorkspace&quot;, &quot;openCyto&quot;, &quot;ggcyto&quot;, &quot;PeacoQC&quot;, &quot;FlowSOM&quot;))</code></pre>
+BiocManager::install(c(&quot;flowCore&quot;, &quot;flowWorkspace&quot;, &quot;openCyto&quot;, &quot;ggcyto&quot;,
+                       &quot;PeacoQC&quot;, &quot;FlowSOM&quot;, &quot;flowSpecs&quot;))</code></pre>
 <p>Then work through the scripts in order, starting with <a href="scripts/01_load_and_metadata.html">01: Load and Metadata</a>.
 Script 01 will walk you through setting up a working directory before
 any files are saved.</p>

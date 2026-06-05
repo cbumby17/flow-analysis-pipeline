@@ -109,7 +109,7 @@ There are substantial negative values from spectral unmixing. A cofactor of 3000
 
 ```{r transform}
 fluor_all  <- setdiff(colnames(ff_unmixed),
-                      c("Time", "SSC.H", "SSC.A", "FSC.H", "FSC.A"))
+                      c("Time", "SSC-H", "SSC-A", "FSC-H", "FSC-A"))
 asinhTrans <- arcsinhTransform(transformationId = "arcsinh", a = 0, b = 1/3000, c = 0)
 transList  <- transformList(fluor_all, asinhTrans)
 ff_transformed <- transform(ff_unmixed, transList)

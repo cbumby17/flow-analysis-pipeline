@@ -56,8 +56,8 @@ ggplot(df_all, aes(x = FSC.A, y = SSC.A)) +
 ```{r scatter_gate}
 scatter_gate <- rectangleGate(
   filterId = "leukocytes",
-  "FSC-A"  = c(50000, 250000),
-  "SSC-A"  = c(0, 150000)
+  "FSC-A"  = c(750000, 3000000),
+  "SSC-A"  = c(50000, 2500000)
 )
 gs_pop_add(gs, scatter_gate, parent = "root")
 recompute(gs)
@@ -67,7 +67,7 @@ recompute(gs)
 ggplot(df_all, aes(x = FSC.A, y = SSC.A)) +
   geom_hex(bins = 80) +
   scale_fill_viridis_c() +
-  geom_rect(aes(xmin = 50000, xmax = 250000, ymin = 0, ymax = 150000),
+  geom_rect(aes(xmin = 750000, xmax = 3000000, ymin = 50000, ymax = 2500000),
             fill = NA, color = "red", linewidth = 0.8, inherit.aes = FALSE) +
   theme_minimal(base_size = 11) +
   labs(title = "Leukocyte gate (red box)")
@@ -92,10 +92,10 @@ singlet_gate <- polygonGate(
   filterId = "singlets",
   .gate = matrix(
     c(
-      50000,  50000,
-      50000, 200000,
-     230000, 250000,
-     250000, 180000
+      750000,  100000,
+      750000, 2100000,
+     3000000, 2700000,
+     3000000, 1500000
     ),
     ncol = 2, byrow = TRUE,
     dimnames = list(NULL, c("FSC-A", "FSC-H"))
@@ -107,8 +107,8 @@ recompute(gs)
 
 ```{r singlet_check, fig.width=6, fig.height=5, warning=FALSE}
 gate_poly <- data.frame(
-  FSC.A = c(50000,  50000, 230000, 250000),
-  FSC.H = c(50000, 200000, 250000, 180000)
+  FSC.A = c( 750000,  750000, 3000000, 3000000),
+  FSC.H = c( 100000, 2100000, 2700000, 1500000)
 )
 ggplot(df_leuko, aes(x = FSC.A, y = FSC.H)) +
   geom_hex(bins = 80) +
@@ -130,16 +130,16 @@ df_sing <- get_pop_df(gs, "singlets")
 
 ggplot(df_sing, aes(x = Viability)) +
   geom_density(fill = "steelblue", alpha = 0.5) +
-  scale_x_log10() +
-  geom_vline(xintercept = 0.5, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = 1.5, color = "red", linetype = "dashed") +
   theme_minimal(base_size = 11) +
-  labs(title = "Viability dye — live cells are dim (left), dead cells bright (right)")
+  labs(title = "Viability dye (arcsinh) — live cells left of threshold, dead cells right",
+       x = "Viability (arcsinh)", y = "Density")
 ```
 
 ```{r live_gate}
 live_gate <- rectangleGate(
   filterId  = "live",
-  "Viability" = c(-Inf, 0.5)
+  "Viability" = c(-Inf, 1.5)
 )
 gs_pop_add(gs, live_gate, parent = "singlets")
 recompute(gs)

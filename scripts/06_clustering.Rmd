@@ -26,6 +26,7 @@ library(ggplot2)
 ```{r load}
 gs      <- load_gs("data/processed/PBMC_gs_gated")
 umap_df <- readRDS("data/processed/PBMC_umap.rds")
+umap_df <- umap_df[, !colnames(umap_df) %in% "Original_ID"]
 ```
 
 This script is for discovery mode — when you want to find populations without defining them manually through gating. For PBMC data with a panel covering all major leukocyte lineages, unsupervised clustering can identify the major populations automatically and confirm (or challenge) your gating strategy. It is also useful for identifying rare populations or functional subsets that might not be obvious from gating alone.
